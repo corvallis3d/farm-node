@@ -1,0 +1,4 @@
+# Ignore the executables when builidng project
+*.exe
+
+# Please add other local files here to not be included in the repository
