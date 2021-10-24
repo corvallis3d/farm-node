@@ -1,12 +1,14 @@
 # farm-node
+
 Will be defined later
-  
+
 ## Pre-Requisites
 
- 1. Golang (Latest)
- 2. GitBas (Latest)
+1.  Golang (Latest)
+2.  GitBash (Latest)
 
 ## Installation
+
 First you want to clone the repository.
 
     git clone https://github.com/corvallis3d/farm-node.git
