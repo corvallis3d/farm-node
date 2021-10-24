@@ -1,4 +1,7 @@
 # Ignore the executables when builidng project
 *.exe
 
+# Ingore the private keys
+private/*
+
 # Please add other local files here to not be included in the repository
