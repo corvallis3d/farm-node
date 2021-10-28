@@ -53,12 +53,15 @@ func jobsSnapshot(ctx context.Context, client *firestore.Client) {
 				fmt.Println("Job Document has been added")
 				// Append our current document in our array
 				jobDocs = append(jobDocs, orderDocument)
+				fmt.Println(jobDocs[index])
+				fmt.Println(jobDocs)
 				// Do something when document is added?
 			case firestore.DocumentModified:
 				// Document has been modified
 				fmt.Println("Job Document has been modified")
-				// Modify that element in our local array
+				// Modify that element in our local array, orderDocument = document that was just modified
 				jobDocs[docChange.NewIndex] = orderDocument
+				fmt.Println(orderDocument)
 				// Do something when document is modified?
 			case firestore.DocumentRemoved:
 				// Document has been removed
@@ -80,7 +83,7 @@ func jobsSnapshot(ctx context.Context, client *firestore.Client) {
 func FirebaseInstance() (*firestore.Client, context.Context, error) {
 
 	// Get static variables for setting up the firestore
-	var opt = option.WithCredentialsFile("private/farm-automation-2300f-firebase-adminsdk-m90e8-9b8965aa95.json")
+	var opt = option.WithCredentialsFile("private/farm-automation-2300f-firebase-adminsdk-m90e8-bdb46acc12.json")
 	var config = &firebase.Config{ProjectID: "farm-automation-2300f"}
 
 	// Setup the FireStore data
