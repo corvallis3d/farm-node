@@ -8,6 +8,7 @@ import (
 
 	"cloud.google.com/go/firestore"
 	firebase "firebase.google.com/go"
+	"github.com/spf13/viper"
 	"google.golang.org/api/option"
 )
 
@@ -80,8 +81,8 @@ func jobsSnapshot(ctx context.Context, client *firestore.Client) {
 func FirebaseInstance() (*firestore.Client, context.Context, error) {
 
 	// Get static variables for setting up the firestore
-	var opt = option.WithCredentialsFile("private/farm-automation-2300f-firebase-adminsdk-m90e8-9b8965aa95.json")
-	var config = &firebase.Config{ProjectID: "farm-automation-2300f"}
+	var opt = option.WithCredentialsFile(viper.GetString("database.path"))
+	var config = &firebase.Config{ProjectID: viper.GetString("database.projectId")}
 
 	// Setup the FireStore data
 	ctx := context.Background()

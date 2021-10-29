@@ -1,0 +1,14 @@
+title = "Chris's Dev Config"
+
+[owner]
+name = "Christopher Vu"
+
+[database]
+path = "private/farm-automation-2300f-firebase-adminsdk-m90e8-13ec67afac.json"
+projectId = "farm-automation-2300f"
+
+[moonraker]
+baseUrl = "http://localhost:7125/"
+
+[temp]
+filename = "DAMMMMFDM_PLA_Gray_1x20p0_0.2mm_PLA_MK3S_1d4h43m.gcode"
