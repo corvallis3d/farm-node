@@ -1,0 +1,14 @@
+title = "Example Dev Config"
+
+[owner]
+name = "Firstname Lastname"
+
+[database]
+path = "private/[Firebase Admin SDK secret key goes here]"
+projectId = "Project Id Name Example: name"
+
+[moonraker]
+baseUrl = "http://localhost:7125/"
+
+[temp]
+filename = "gcode/example.gcode"

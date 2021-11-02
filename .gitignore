@@ -5,4 +5,4 @@
 private/*
 
 # Please add other local files here to not be included in the repository
-gcode/*
+.gcode
