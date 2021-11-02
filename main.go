@@ -114,8 +114,8 @@ func main() {
 	})
 	viper.WatchConfig()
 
-	// uploadAFile()
-	// printAFile()
+	uploadAFile()
+	printAFile()
 
 	// Get firebase instance
 	// client, ctx, err := FirebaseInstance()

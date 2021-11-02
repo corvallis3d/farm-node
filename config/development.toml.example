@@ -11,4 +11,4 @@ projectId = "Project Id Name Example: name"
 baseUrl = "http://localhost:7125/"
 
 [temp]
-filename = "gcode/example.gcode"
+filename = "example.gcode"
