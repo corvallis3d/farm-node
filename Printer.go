@@ -12,7 +12,9 @@ import (
 type Printer_Interface interface {
 	NewPrinter()
 	Connect()
-	Websocket_receive_thread()
+	Start_receive_thread()
+	Change_printer_status(s string)
+	Send_print_file()
 }
 
 type Printer struct {
@@ -65,4 +67,37 @@ func (p *Printer) Start_receive_thread() {
 			}
 		}
 	}()
+}
+
+func (p *Printer) Change_printer_status(s string) {
+	msg := `{
+		"jsonrpc": "2.0",
+		"method": "printer.gcode.script",
+		"params": {
+			"script": "M117_` + s + `"
+		},
+		"id": 7466}`
+	var payload = []byte(fmt.Sprintf(msg))
+	err := p.ws.WriteMessage(websocket.TextMessage, payload)
+	if err != nil {
+		log.Println("write:", err)
+		return
+	}
+}
+
+func (p *Printer) Send_print_file() {
+	msg := `{
+			"jsonrpc": "2.0",
+			"method": "printer.print.start",
+			"params": {
+				"filename": "testing.gcode"
+			},
+			"id": 4654
+		}`
+	var payload = []byte(fmt.Sprintf(msg))
+	err := p.ws.WriteMessage(websocket.TextMessage, payload)
+	if err != nil {
+		log.Println("write:", err)
+		return
+	}
 }
