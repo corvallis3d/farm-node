@@ -15,6 +15,9 @@ type Printer_Interface interface {
 	Start_receive_thread()
 	Change_printer_status(s string)
 	Send_print_file()
+	Pause_printer()
+	Enqueue_file()
+	Send_msg()
 }
 
 type Printer struct {
@@ -69,6 +72,15 @@ func (p *Printer) Start_receive_thread() {
 	}()
 }
 
+func (p *Printer) Send_msg(msg string) {
+	var payload = []byte(fmt.Sprintf(msg))
+	err := p.ws.WriteMessage(websocket.TextMessage, payload)
+	if err != nil {
+		log.Println("write:", err)
+		return
+	}
+}
+
 func (p *Printer) Change_printer_status(s string) {
 	msg := `{
 		"jsonrpc": "2.0",
@@ -77,12 +89,7 @@ func (p *Printer) Change_printer_status(s string) {
 			"script": "M117_` + s + `"
 		},
 		"id": 7466}`
-	var payload = []byte(fmt.Sprintf(msg))
-	err := p.ws.WriteMessage(websocket.TextMessage, payload)
-	if err != nil {
-		log.Println("write:", err)
-		return
-	}
+	p.Send_msg(msg)
 }
 
 func (p *Printer) Send_print_file() {
@@ -94,10 +101,28 @@ func (p *Printer) Send_print_file() {
 			},
 			"id": 4654
 		}`
-	var payload = []byte(fmt.Sprintf(msg))
-	err := p.ws.WriteMessage(websocket.TextMessage, payload)
-	if err != nil {
-		log.Println("write:", err)
-		return
-	}
+	p.Send_msg(msg)
+}
+
+func (p *Printer) Enqueue_file() {
+	msg := `{
+		"jsonrpc": "2.0",
+		"method": "server.job_queue.post_job",
+		"params": {
+			"filenames": [
+				"testing.gcode",
+			]
+		},
+		"id": 4654
+	}`
+	p.Send_msg(msg)
+}
+
+func (p *Printer) Pause_printer() {
+	msg := `{
+		"jsonrpc": "2.0",
+		"method": "printer.print.pause",
+		"id": 4564
+	}`
+	p.Send_msg(msg)
 }
