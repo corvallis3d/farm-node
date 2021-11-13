@@ -11,7 +11,8 @@ func main() {
 	p.Change_printer_status("Test String")
 	// p.Send_print_file()
 	p.Enqueue_file()
-	time.Sleep(10 * time.Second)
+	p.Resume_queue()
+	time.Sleep(3 * time.Second)
 	p.Pause_printer()
 
 }

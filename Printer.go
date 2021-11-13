@@ -13,11 +13,12 @@ type Printer_Interface interface {
 	NewPrinter()
 	Connect()
 	Start_receive_thread()
+	Send_msg()
 	Change_printer_status(s string)
 	Send_print_file()
 	Pause_printer()
 	Enqueue_file()
-	Send_msg()
+	Resume_queue()
 }
 
 type Printer struct {
@@ -113,6 +114,15 @@ func (p *Printer) Enqueue_file() {
 				"testing.gcode",
 			]
 		},
+		"id": 4654
+	}`
+	p.Send_msg(msg)
+}
+
+func (p *Printer) Resume_queue() {
+	msg := `{
+		"jsonrpc": "2.0",
+		"method": "server.job_queue.resume",
 		"id": 4654
 	}`
 	p.Send_msg(msg)
