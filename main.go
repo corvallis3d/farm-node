@@ -21,8 +21,6 @@ func main() {
 	})
 	viper.WatchConfig()
 
-	//printAFile()
-
 	// Get firebase instance
 	client, ctx, err := FirebaseInstance()
 	if err != nil {
