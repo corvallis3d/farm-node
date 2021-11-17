@@ -20,6 +20,11 @@ func main() {
 		fmt.Println("Config file changed:", e.Name)
 	})
 	viper.WatchConfig()
+	var printerArray []Printer
+
+	p := NewPrinter("localhost", "7125")
+	p.Connect()
+	p.Start_receive_thread()
 
 	//printAFile()
 
@@ -30,7 +35,7 @@ func main() {
 	}
 
 	// Spin-off snapshot worker
-	go jobsSnapshot(ctx, client)
+	go jobsSnapshot(ctx, client, printerArray)
 	// Wait forever!
 	for {
 

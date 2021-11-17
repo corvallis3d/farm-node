@@ -23,7 +23,7 @@ var jobs = []Job{}
 var stored_index = 0
 
 // jobsSnapshot keeps our local global jobs in sync with firebase
-func jobsSnapshot(ctx context.Context, client *firestore.Client) {
+func jobsSnapshot(ctx context.Context, client *firestore.Client, printerArray []Printer) {
 
 	// Get all our order documents
 	snapIter := client.Collection("jobs").Snapshots(ctx)
@@ -63,8 +63,6 @@ func jobsSnapshot(ctx context.Context, client *firestore.Client) {
 				// Append our current document in our array
 				jobDocs = append(jobDocs, orderDocument)
 				stored_index = index
-				fmt.Println(jobDocs[index])
-				fmt.Println(jobDocs)
 				// Do something when document is added?
 			case firestore.DocumentModified:
 				// Document has been modified
@@ -86,8 +84,12 @@ func jobsSnapshot(ctx context.Context, client *firestore.Client) {
 
 		// Save to our global variable
 		jobs = jobDocs
-		uploadAFile()
-		printAFile()
+		fileName := jobs[0].GcodeFiles[0].Filename
+		fmt.Println(fileName)
+
+		//uploadAFile()
+		// call printer selector function
+		p.startPrintJob(fileName)
 	}
 }
 
@@ -113,7 +115,7 @@ func FirebaseInstance() (*firestore.Client, context.Context, error) {
 }
 
 func uploadAFile() {
-	fileName := jobs[len(jobs)-1].Filename
+	fileName := jobs[len(jobs)-1].GcodeFiles[0].Filename
 	fmt.Println(fileName)
 	url := viper.GetString("moonraker.baseUrl") + "server/files/upload"
 	method := "POST"
@@ -143,48 +145,6 @@ func uploadAFile() {
 		return
 	}
 	req.Header.Set("Content-Type", writer.FormDataContentType())
-	res, err := client.Do(req)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	defer res.Body.Close()
-
-	body, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	fmt.Println(string(body))
-}
-
-func printAFile() {
-	// Note: This function works but must be adapted to our use case, as in get it to work with our Firebase system
-	// TO DO: Job struct passed in as argument, have url param filename be set to filename from struct
-	fileName := jobs[len(jobs)-1].Filename
-	url := viper.GetString("moonraker.baseUrl") + "printer/print/start?filename=" + fileName
-	method := "POST"
-
-	var payload = []byte(fmt.Sprintf(
-		`{
-			"jsonrpc": "2.0",
-			"method": "printer.print.start",
-			"params": {
-				"filename": %s
-			}
-		}`,
-		fileName,
-	))
-
-	client := &http.Client{}
-	req, err := http.NewRequest(method, url, bytes.NewBuffer(payload))
-
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	req.Header.Add("Content-Type", "application/json")
-
 	res, err := client.Do(req)
 	if err != nil {
 		fmt.Println(err)
