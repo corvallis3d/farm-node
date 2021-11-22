@@ -89,7 +89,7 @@ func jobsSnapshot(ctx context.Context, client *firestore.Client, printerArray []
 
 		//uploadAFile()
 		// call printer selector function
-		p.startPrintJob(fileName)
+		// p.startPrintJob(fileName)
 	}
 }
 

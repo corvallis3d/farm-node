@@ -20,13 +20,23 @@ func main() {
 		fmt.Println("Config file changed:", e.Name)
 	})
 	viper.WatchConfig()
+
 	var printerArray []Printer
 
-	p := NewPrinter("localhost", "7125")
-	p.Connect()
-	p.Start_receive_thread()
+	printers := viper.GetStringMap("printers")
 
-	//printAFile()
+	for i := range printers {
+		printer_host := "printers." + i + ".host"
+		printer_port := "printers." + i + ".port"
+
+		// fmt.Printf("%s, %s\n", viper.GetString(printer_host), viper.GetString(printer_port))
+
+		p := NewPrinter(viper.GetString(printer_host), viper.GetString(printer_port))
+		p.Connect()
+		p.Start_receive_thread()
+
+		printerArray = append(printerArray, *p)
+	}
 
 	// Get firebase instance
 	client, ctx, err := FirebaseInstance()
