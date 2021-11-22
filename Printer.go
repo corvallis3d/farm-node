@@ -18,6 +18,7 @@ type Printer_Interface interface {
 	Send_print_file()
 	Pause_printer()
 	Enqueue_file()
+	Queue_state()
 	Resume_queue()
 }
 
@@ -64,9 +65,10 @@ func (p *Printer) Start_receive_thread() {
 			json.Unmarshal([]byte(message), &b)
 			if p.recv_flag == true {
 				log.Println("recv:")
-				for k, v := range b {
-					fmt.Printf("%s: %s\n", k, v)
-				}
+				fmt.Println(b)
+				// for k, v := range b {
+				// 	fmt.Printf("%s: %s\n", k, v)
+				// }
 				fmt.Printf("\n")
 			}
 		}
@@ -74,7 +76,7 @@ func (p *Printer) Start_receive_thread() {
 }
 
 func (p *Printer) Send_msg(msg string) {
-	var payload = []byte(fmt.Sprintf(msg))
+	var payload = []byte(msg)
 	err := p.ws.WriteMessage(websocket.TextMessage, payload)
 	if err != nil {
 		log.Println("write:", err)
@@ -111,7 +113,7 @@ func (p *Printer) Enqueue_file() {
 		"method": "server.job_queue.post_job",
 		"params": {
 			"filenames": [
-				"testing.gcode",
+				"gcode/testing.gcode",
 			]
 		},
 		"id": 4654
@@ -128,11 +130,15 @@ func (p *Printer) Resume_queue() {
 	p.Send_msg(msg)
 }
 
+func (p *Printer) Queue_state() {
+	msg := `{"jsonrpc": "2.0","method": "server.job_queue.status","id": 553232}`
+	p.Send_msg(msg)
+}
+
 func (p *Printer) Pause_printer() {
 	msg := `{
 		"jsonrpc": "2.0",
 		"method": "printer.print.pause",
-		"id": 4564
-	}`
+		"id": 1988}`
 	p.Send_msg(msg)
 }
