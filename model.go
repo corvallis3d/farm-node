@@ -1,8 +1,10 @@
 package main
 
 type Job struct {
-	GcodeFiles []GcodeFile `firestore:"gcode"`
-	Status     int         `firestore:"status"`
+	JobId        string
+	NumberOfJobs int
+	GcodeFiles   []GcodeFile `firestore:"gcode"`
+	Status       int         `firestore:"status"`
 }
 
 type GcodeFile struct {

@@ -20,10 +20,10 @@ import (
 )
 
 var jobs = []Job{}
-var stored_index = 0
+var printerArray []Printer
 
 // jobsSnapshot keeps our local global jobs in sync with firebase
-func jobsSnapshot(ctx context.Context, client *firestore.Client, printerArray []Printer) {
+func jobsSnapshot(ctx context.Context, client *firestore.Client) {
 
 	// Get all our order documents
 	snapIter := client.Collection("jobs").Snapshots(ctx)
@@ -37,7 +37,6 @@ func jobsSnapshot(ctx context.Context, client *firestore.Client, printerArray []
 		// Prepare our snapshot changes
 		snap, err := snapIter.Next()
 		if err != nil {
-			err = errors.New("Order Document Issue reading from the database")
 			fmt.Println(err)
 		}
 
@@ -62,8 +61,8 @@ func jobsSnapshot(ctx context.Context, client *firestore.Client, printerArray []
 				fmt.Println("Job Document has been added")
 				// Append our current document in our array
 				jobDocs = append(jobDocs, orderDocument)
-				stored_index = index
 				// Do something when document is added?
+				fmt.Println(orderDocument)
 			case firestore.DocumentModified:
 				// Document has been modified
 				fmt.Println("Job Document has been modified")
@@ -84,12 +83,6 @@ func jobsSnapshot(ctx context.Context, client *firestore.Client, printerArray []
 
 		// Save to our global variable
 		jobs = jobDocs
-		fileName := jobs[0].GcodeFiles[0].Filename
-		fmt.Println(fileName)
-
-		//uploadAFile()
-		// call printer selector function
-		// p.startPrintJob(fileName)
 	}
 }
 
@@ -114,6 +107,7 @@ func FirebaseInstance() (*firestore.Client, context.Context, error) {
 	return client, ctx, nil
 }
 
+// Uploads a single gcode file. NEEDS TO MODIFIED to accept filepath as argument
 func uploadAFile() {
 	fileName := jobs[len(jobs)-1].GcodeFiles[0].Filename
 	fmt.Println(fileName)
@@ -159,3 +153,26 @@ func uploadAFile() {
 	}
 	fmt.Println(string(body))
 }
+
+// Parses the toml config for printer host and ports, creates printer objects,
+// and stores Printer pointers in array
+func instantiateAllPrinters() {
+	printers := viper.GetStringMap("printers")
+
+	for i := range printers {
+		printer_host := "printers." + i + ".host"
+		printer_port := "printers." + i + ".port"
+
+		// fmt.Printf("%s, %s\n", viper.GetString(printer_host), viper.GetString(printer_port))
+
+		p := NewPrinter(viper.GetString(printer_host), viper.GetString(printer_port))
+		p.Connect()
+		p.Start_receive_thread()
+
+		printerArray = append(printerArray, *p)
+	}
+}
+
+// Have printers call method to update their status
+
+// Send filament request
