@@ -1,21 +1,19 @@
 package main
 
 type Job struct {
-	JobId        string
-	NumberOfJobs int
-	GcodeFiles   []GcodeFile `firestore:"gcode"`
-	Status       int         `firestore:"status"`
+	JobId      string
+	GcodeFiles []GcodeFile `firestore:"gcode"`
+	Status     int         `firestore:"status"`
 }
 
 type GcodeFile struct {
 	JobId     string
 	FileIndex int
-
-	Filename string  `firestore:"filename"`
-	Time     float64 `firestore:"time"`
-	Status   int     `firestore:"status"`
-	Filament `firestore:"filament"`
-	MaxDim   `firestore:"max_dim"`
+	Filename  string  `firestore:"filename"`
+	Time      float64 `firestore:"time"`
+	Status    int     `firestore:"status"`
+	Filament  `firestore:"filament"`
+	MaxDim    `firestore:"max_dim"`
 }
 
 type Filament struct {
