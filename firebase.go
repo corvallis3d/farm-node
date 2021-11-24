@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"cloud.google.com/go/firestore"
 	firebase "firebase.google.com/go"
@@ -21,6 +22,8 @@ import (
 
 var jobs = []Job{}
 var printerArray []Printer
+
+var gcodeQueue []GcodeFile
 
 // jobsSnapshot keeps our local global jobs in sync with firebase
 func jobsSnapshot(ctx context.Context, client *firestore.Client) {
@@ -54,6 +57,15 @@ func jobsSnapshot(ctx context.Context, client *firestore.Client) {
 				fmt.Println(err.Error())
 			}
 
+			// Give the Job its document ID from the database
+			orderDocument.JobId = docChange.Doc.Ref.ID
+			// Give each of the Gcode files the ID of its Job
+			// Give each of the Gcode files their index
+			for i := range orderDocument.GcodeFiles {
+				orderDocument.GcodeFiles[i].JobId = docChange.Doc.Ref.ID
+				orderDocument.GcodeFiles[i].FileIndex = i
+			}
+
 			// Check each possible case of the changes that could occur
 			switch change := docChange.Kind; change {
 			case firestore.DocumentAdded:
@@ -62,7 +74,11 @@ func jobsSnapshot(ctx context.Context, client *firestore.Client) {
 				// Append our current document in our array
 				jobDocs = append(jobDocs, orderDocument)
 				// Do something when document is added?
-				fmt.Println(orderDocument)
+
+				// Put all the Gcode files into gcodeQueue
+				for i := range orderDocument.GcodeFiles {
+					gcodeQueue = append(gcodeQueue, orderDocument.GcodeFiles[i])
+				}
 			case firestore.DocumentModified:
 				// Document has been modified
 				fmt.Println("Job Document has been modified")
@@ -80,7 +96,6 @@ func jobsSnapshot(ctx context.Context, client *firestore.Client) {
 				fmt.Println("Default Job Document changes called")
 			}
 		}
-
 		// Save to our global variable
 		jobs = jobDocs
 	}
@@ -107,9 +122,8 @@ func FirebaseInstance() (*firestore.Client, context.Context, error) {
 	return client, ctx, nil
 }
 
-// Uploads a single gcode file. NEEDS TO MODIFIED to accept filepath as argument
-func uploadAFile() {
-	fileName := jobs[len(jobs)-1].GcodeFiles[0].Filename
+// Uploads a single gcode file.
+func uploadAFile(fileName string) {
 	fmt.Println(fileName)
 	url := viper.GetString("moonraker.baseUrl") + "server/files/upload"
 	method := "POST"
@@ -174,5 +188,74 @@ func instantiateAllPrinters() {
 }
 
 // Have printers call method to update their status
+func updatePrinterStatus() {
+	for {
+		for range time.Tick(time.Second * 10) {
+			for i, p := range printerArray {
+				fmt.Println(i, p)
+			}
+		}
+	}
+}
 
-// Send filament request
+// Send request to printer to have filament loaded.
+// The filament type and color will come from the Gcode file being processed
+func sendFilamentRequest() {}
+
+// NOTE: not working properly, replacing entire gcode element with only
+// status: 2
+// Update status for a single Gcode file in database
+func updateFileStatus(gcode GcodeFile, ctx context.Context, client *firestore.Client) {
+	jobId := gcode.JobId
+	fileIndex := gcode.FileIndex
+	job := client.Collection("jobs").Doc(jobId)
+
+	path := fmt.Sprintf("gcode.%d.status", fileIndex)
+	_, err := job.Update(ctx, []firestore.Update{{Path: path, Value: 2}})
+	if err != nil {
+		fmt.Println(err)
+	}
+}
+
+func managePrintJobs(ctx context.Context, client *firestore.Client) {
+	// Just keep looping
+	for {
+		// if gcodeQueue is empty
+		if len(gcodeQueue) == 0 {
+			continue
+		}
+
+		// First Gcode file popped from queue
+		gcode := gcodeQueue[0]
+		gcodeQueue = gcodeQueue[1:]
+
+		// TEST BLOCK START
+		// gcode.Status = 2
+		// updateFileStatus(gcode, ctx, client)
+		// TEST BLOCK END
+
+		// We need to loop through the printers array to see if any can handle the file
+		for i := range printerArray {
+			// A printer can handle the file if the printer's status is idle,
+			// and the filament matches the filament in the gcodeFile
+			if printerArray[i].color == gcode.Filament.Color &&
+				printerArray[i].filament == gcode.Filament.Material {
+
+				// Upload a file to this printer, pass in the filename
+				uploadAFile(gcode.Filename)
+
+				// Set file status code to 2 in database, we need the JobId,
+				// and the FileIndex.
+				gcode.Status = 2
+				updateFileStatus(gcode, ctx, client)
+			}
+		}
+
+		// If none of the printers can handle the file, but there is an idle,
+		// printer, call sendFilamentRequest() for that printer and wait for
+		// response
+
+		// If none can handle, just reloop again.
+		// FIFO approach. Blocks at last popped file until it can be handled.
+	}
+}

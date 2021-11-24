@@ -8,6 +8,9 @@ type Job struct {
 }
 
 type GcodeFile struct {
+	JobId     string
+	FileIndex int
+
 	Filename string  `firestore:"filename"`
 	Time     float64 `firestore:"time"`
 	Status   int     `firestore:"status"`
