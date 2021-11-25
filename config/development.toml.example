@@ -7,8 +7,16 @@ name = "Firstname Lastname"
 path = "private/[Firebase Admin SDK secret key goes here]"
 projectId = "Project Id Name Example: name"
 
-[moonraker]
-baseUrl = "http://localhost:7125/"
+[printer_dimensions]
+height = 0
+width = 0
+length = 0
 
-[temp]
-filename = "example.gcode"
+[printers]
+    [printers.0]
+    host = "localhost"
+    port = 7125
+
+    [printers.1]
+    host = "localhost"
+    port = 8080
