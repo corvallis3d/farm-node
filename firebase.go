@@ -13,7 +13,7 @@ import (
 )
 
 var jobs = []Job{}
-var printerArray []Printer
+var printerArray []Print
 
 var gcodeQueue []GcodeFile
 
@@ -145,10 +145,6 @@ func updatePrinterStatus() {
 	}
 }
 
-// Send request to printer to have filament loaded.
-// The filament type and color will come from the Gcode file being processed
-func sendFilamentRequest() {}
-
 // Update status for a single Gcode file in database
 // Copies whole doc, modifes, then replaces
 func updateFileStatus(gcode GcodeFile, ctx context.Context, client *firestore.Client) {
@@ -195,7 +191,6 @@ func managePrintJobs(ctx context.Context, client *firestore.Client) {
 		// First Gcode file popped from queue
 		gcode := gcodeQueue[0]
 		gcodeQueue = gcodeQueue[1:]
-
 		// We need to loop through the printers array to see if any can handle the file
 		for i := range printerArray {
 			// A printer can handle the file if the printer's status is idle,
@@ -204,7 +199,7 @@ func managePrintJobs(ctx context.Context, client *firestore.Client) {
 			if printerArray[i].color == gcode.Filament.Color &&
 				printerArray[i].filament == gcode.Filament.Material {
 
-				// printerArray[i].sendJobPendingNotification(gcode)
+				printerArray[i].sendFilamentRequest(gcode)
 
 				// Set gcode file status to 2 locally
 				gcode.Status = 2

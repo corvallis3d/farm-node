@@ -50,6 +50,10 @@ func NewPrinter(host string, port string) *Print {
 	return p
 }
 
+func (p *Print) sendFilamentRequest(gcode GcodeFile) {
+	p.Upload_file(gcode)
+}
+
 func (p *Print) Connect() {
 	u := url.URL{Scheme: "ws", Host: p.host + ":" + p.port, Path: "/websocket"}
 	log.Printf("connecting to %s", u.String())
@@ -190,14 +194,13 @@ func (p *Print) Get_printer_status() {
 	}
 }
 
-func (p *Print) Upload_file(file_name string) {
+func (p *Print) Upload_file(gcode GcodeFile) {
 	url := url.URL{Scheme: "http", Host: p.host + ":" + p.port, Path: "/server/files/upload"}
 	payload := &bytes.Buffer{}
 	writer := multipart.NewWriter(payload)
-	file, errFile1 := os.Open(fmt.Sprintf("./gcode/%s", file_name))
+	file, errFile1 := os.Open(fmt.Sprintf("C:/Models/Processed Orders/Order #%s - First Last/Upload-Gcode/%s", gcode.JobId, gcode.Filename))
 	defer file.Close()
-	part1,
-		errFile1 := writer.CreateFormFile("file", filepath.Base(fmt.Sprintf("./gcode/%s", file_name)))
+	part1, errFile1 := writer.CreateFormFile("file", filepath.Base(fmt.Sprintf("C:/Models/Processed Orders/Order #%s - First Last/Upload-Gcode/%s", gcode.JobId, gcode.Filename)))
 	_, errFile1 = io.Copy(part1, file)
 	if errFile1 != nil {
 		fmt.Println(errFile1)
