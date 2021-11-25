@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -16,7 +15,7 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-type Printer_Interface interface {
+type Printer interface {
 	NewPrinter()
 	Connect()
 	Start_receive_thread()
@@ -26,11 +25,11 @@ type Printer_Interface interface {
 	Default_display()
 	Upload_file(file_name string)
 	Start_print()
-	Print_json_rpc(data json_rpc_data)
+	// Print_json_rpc(data json_rpc_data)
 	Get_printer_status()
 }
 
-type Printer struct {
+type Print struct {
 	host       string
 	port       string
 	ws         *websocket.Conn
@@ -42,17 +41,8 @@ type Printer struct {
 	done       chan struct{}
 }
 
-type json_rpc_data struct {
-	Jsonrpc string
-	Method  string
-	Params  interface{}
-	Result  interface{}
-	Error   interface{}
-	Id      int
-}
-
-func NewPrinter(host string, port string) *Printer {
-	p := new(Printer)
+func NewPrinter(host string, port string) *Print {
+	p := new(Print)
 	p.host = host
 	p.port = port
 	p.recv_flag = true
@@ -60,7 +50,7 @@ func NewPrinter(host string, port string) *Printer {
 	return p
 }
 
-func (p *Printer) Connect() {
+func (p *Print) Connect() {
 	u := url.URL{Scheme: "ws", Host: p.host + ":" + p.port, Path: "/websocket"}
 	log.Printf("connecting to %s", u.String())
 	var err error
@@ -70,7 +60,7 @@ func (p *Printer) Connect() {
 	}
 }
 
-func (p *Printer) Start_receive_thread() {
+func (p *Print) Start_receive_thread() {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
@@ -82,51 +72,50 @@ func (p *Printer) Start_receive_thread() {
 				return
 			}
 
-			// var data map[string]interface{}
-			var data json_rpc_data
-			err = json.Unmarshal([]byte(message), &data)
-			if err != nil {
-				log.Fatal(err)
-			}
+			// data := New_rpc_req_p()
+			// err = json.Unmarshal(message, &data)
+			// if err != nil {
+			// 	log.Fatal(err)
+			// }
+			fmt.Print("\n")
+			log.Print("\n", string(message))
 
-			if p.recv_flag == true {
-				log.Printf("recv:")
-				// fmt.Println([]byte(message))
-				p.Print_json_rpc(data)
-				// fmt.Println(data)
-				p.Is_printer_ready(data)
-				fmt.Printf("\n")
-			}
+			// p.Print_json_rpc(data)
 		}
 	}()
 }
-func (p *Printer) Print_json_rpc(data json_rpc_data) {
-	if data.Method != "" {
-		fmt.Printf("Method: %s\n", data.Method)
-	}
-	if data.Method != "notify_proc_stat_update" && data.Params != nil {
-		fmt.Printf("Params: %s\n", data.Params)
-	}
-	if data.Result != nil {
-		fmt.Printf("Resut: %s\n", data.Result)
-	}
-	if data.Error != nil {
-		fmt.Printf("Error: %s\n", data.Error)
-	}
-	if data.Id != 0 {
-		fmt.Printf("Id: %d\n", data.Id)
-	}
+
+func (p *Print) Process_message() {
+
 }
 
-func (p *Printer) Is_printer_ready(msg json_rpc_data) {
-	if compare, ok := msg.Params.([]interface{}); ok {
-		if compare[len(compare)-1] == "// printer_ready" {
-			p.print_flag = true
-		}
-	}
-}
+// func (p *Print) Print_json_rpc(data Json_rpc_req) {
+// 	if data.Method != "" {
+// 		fmt.Printf("Method: %s\n", data.Method)
+// 	}
+// 	if data.Method != "notify_proc_stat_update" && data.Params != nil {
+// 		fmt.Printf("Params: %s\n", data.Params)
+// 	}
+// 	if data.Result != "" {
+// 		fmt.Printf("Resut: %s\n", data.Result)
+// 	}
+// 	if data.Error.Message != "" {
+// 		fmt.Printf("Error: %s\n", data.Error.Message)
+// 	}
+// 	if data.Id != 0 {
+// 		fmt.Printf("Id: %d\n", data.Id)
+// 	}
+// }
 
-func (p *Printer) Send_msg(msg string) {
+// func (p *Print) Is_printer_ready(msg json_rpc_data) {
+// 	if compare, ok := msg.Params.([]interface{}); ok {
+// 		if compare[len(compare)-1] == "// printer_ready" {
+// 			p.print_flag = true
+// 		}
+// 	}
+// }
+
+func (p *Print) Send_msg(msg string) {
 	var payload = []byte(msg)
 	err := p.ws.WriteMessage(websocket.TextMessage, payload)
 	if err != nil {
@@ -135,7 +124,7 @@ func (p *Printer) Send_msg(msg string) {
 	}
 }
 
-func (p *Printer) Send_print_notification() {
+func (p *Print) Send_print_notification() {
 	msg :=
 		`{
 			"jsonrpc": "2.0",
@@ -148,7 +137,7 @@ func (p *Printer) Send_print_notification() {
 	p.Send_msg(msg)
 }
 
-func (p *Printer) Default_display() {
+func (p *Print) Default_display() {
 	msg :=
 		`{
 			"jsonrpc": "2.0",
@@ -161,7 +150,7 @@ func (p *Printer) Default_display() {
 	p.Send_msg(msg)
 }
 
-func (p *Printer) Change_notification_string(s string) {
+func (p *Print) Change_notification_string(s string) {
 	s = "'" + s + "'"
 	msg :=
 		`{
@@ -175,7 +164,7 @@ func (p *Printer) Change_notification_string(s string) {
 	p.Send_msg(msg)
 }
 
-func (p *Printer) Start_print() {
+func (p *Print) Start_print() {
 	msg := `{
 			"jsonrpc": "2.0",
 			"method": "printer.print.start",
@@ -188,15 +177,19 @@ func (p *Printer) Start_print() {
 	p.print_flag = false
 }
 
-func (p *Printer) Get_printer_status() {
-	msg := `{
-		"jsonrpc": "2.0",
-		"method": "printer.info",
-		"id": 1988}`
-	p.Send_msg(msg)
+func (p *Print) Get_printer_status() {
+	fmt.Print("\nAAAAAAAAAAAAAAAAAAAAAAa")
+	msg := New_rpc_req()
+	msg.Method = "printer.info"
+	msg.Id = 1988
+	err := p.ws.WriteJSON(msg)
+	if err != nil {
+		log.Println("write:", err)
+		return
+	}
 }
 
-func (p *Printer) Upload_file(file_name string) {
+func (p *Print) Upload_file(file_name string) {
 	url := url.URL{Scheme: "http", Host: p.host + ":" + p.port, Path: "/server/files/upload"}
 	payload := &bytes.Buffer{}
 	writer := multipart.NewWriter(payload)

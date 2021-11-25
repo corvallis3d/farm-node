@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"time"
 )
 
@@ -20,15 +19,20 @@ func main() {
 	p.Send_print_notification()
 
 	for {
-		// Check if user accepted print order throug LCD user input
-		if p.print_flag {
-			fmt.Print("############# Print order Accepted") // terminal print
-			p.Upload_file(file_name)
-			p.Start_print()
-			//GCode macro removes notification and set display to default
-		} else {
-			p.Get_printer_status()
-			time.Sleep(time.Second)
-		}
+		p.Get_printer_status()
+		time.Sleep(3 * time.Second)
 	}
+
+	// for {
+	// 	// Check if user accepted print order throug LCD user input
+	// 	if p.print_flag {
+	// 		fmt.Print("############# Print order Accepted") // terminal print
+	// 		p.Upload_file(file_name)
+	// 		p.Start_print()
+	// 		//GCode macro removes notification and set display to default
+	// 	} else {
+	// 		p.Get_printer_status()
+	// 		time.Sleep(time.Second)
+	// 	}
+	// }
 }
