@@ -33,9 +33,6 @@ func main() {
 	// Spin-off snapshot worker
 	go jobsSnapshot(ctx, client)
 
-	// Work in progress
-	go updatePrinterStatus()
-
 	go managePrintJobs(ctx, client)
 
 	// Wait forever!

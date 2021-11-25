@@ -1,16 +1,9 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"io"
-	"io/ioutil"
 	"log"
-	"mime/multipart"
-	"net/http"
-	"os"
-	"path/filepath"
 	"time"
 
 	"cloud.google.com/go/firestore"
@@ -122,52 +115,6 @@ func FirebaseInstance() (*firestore.Client, context.Context, error) {
 	return client, ctx, nil
 }
 
-// Uploads a single gcode file.
-func uploadAFile(fileName string) {
-	fmt.Println(fileName)
-	url := viper.GetString("moonraker.baseUrl") + "server/files/upload"
-	method := "POST"
-
-	payload := &bytes.Buffer{}
-	writer := multipart.NewWriter(payload)
-	file, errFile1 := os.Open(fmt.Sprintf("./gcode/%s", fileName))
-	defer file.Close()
-	part1,
-		errFile1 := writer.CreateFormFile("file", filepath.Base(fmt.Sprintf("./gcode/%s", fileName)))
-	_, errFile1 = io.Copy(part1, file)
-	if errFile1 != nil {
-		fmt.Println(errFile1)
-		return
-	}
-	err := writer.Close()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	client := &http.Client{}
-	req, err := http.NewRequest(method, url, payload)
-
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-	res, err := client.Do(req)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	defer res.Body.Close()
-
-	body, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	fmt.Println(string(body))
-}
-
 // Parses the toml config for printer host and ports, creates printer objects,
 // and stores Printer pointers in array
 func instantiateAllPrinters() {
@@ -257,8 +204,7 @@ func managePrintJobs(ctx context.Context, client *firestore.Client) {
 			if printerArray[i].color == gcode.Filament.Color &&
 				printerArray[i].filament == gcode.Filament.Material {
 
-				// Upload a file to this printer, pass in the filename
-				uploadAFile(gcode.Filename)
+				// printerArray[i].sendJobPendingNotification(gcode)
 
 				// Set gcode file status to 2 locally
 				gcode.Status = 2

@@ -19,6 +19,7 @@ type Printer_Interface interface {
 	Pause_printer()
 	Enqueue_file()
 	Resume_queue()
+	sendJobPendingNotification(gcode GcodeFile)
 }
 
 type Printer struct {
@@ -156,4 +157,8 @@ func get_printer_status(ws *websocket.Conn) {
 		log.Println("write:", err)
 		return
 	}
+}
+
+func sendJobPendingNotification(gcode GcodeFile) {
+
 }
