@@ -136,12 +136,8 @@ func instantiateAllPrinters() {
 
 // Have printers call method to update their status
 func updatePrinterStatus() {
-	for {
-		for range time.Tick(time.Second * 10) {
-			for i, p := range printerArray {
-				fmt.Println(i, p)
-			}
-		}
+	for i, p := range printerArray {
+		fmt.Println(i, p)
 	}
 }
 
@@ -182,7 +178,7 @@ func updateFileStatus(gcode GcodeFile, ctx context.Context, client *firestore.Cl
 
 func managePrintJobs(ctx context.Context, client *firestore.Client) {
 	// Just keep looping
-	for {
+	for range time.Tick(time.Second * 10) {
 		// if gcodeQueue is empty
 		if len(gcodeQueue) == 0 {
 			continue
@@ -191,6 +187,9 @@ func managePrintJobs(ctx context.Context, client *firestore.Client) {
 		// First Gcode file popped from queue
 		gcode := gcodeQueue[0]
 		gcodeQueue = gcodeQueue[1:]
+
+		updatePrinterStatus()
+
 		// We need to loop through the printers array to see if any can handle the file
 		for i := range printerArray {
 			// A printer can handle the file if the printer's status is idle,
