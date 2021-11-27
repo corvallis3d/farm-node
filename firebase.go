@@ -137,7 +137,7 @@ func instantiateAllPrinters() {
 
 		p := NewPrinter(viper.GetString(printer_host), viper.GetString(printer_port))
 		p.Connect()
-		p.Start_receive_thread()
+		p.StartReceiveThread()
 
 		printerArray = append(printerArray, *p)
 	}
@@ -199,27 +199,35 @@ func managePrintJobs(ctx context.Context, client *firestore.Client) {
 
 		updatePrinterStatus()
 
-		// We need to loop through the printers array to see if any can handle the file
+		// We need to loop through the printers array to see if any can handle
+		// the file
 		for i := range printerArray {
+
+			printer := printerArray[i]
+
 			// A printer can handle the file if the printer's status is idle,
 			// the file's max_dim does not exceed printer dimensions, and the
 			// filament matches the filament in the gcodeFile
-			if printerArray[i].color == gcode.Filament.Color &&
-				printerArray[i].filament == gcode.Filament.Material {
+			if (printer.color == gcode.Filament.Color &&
+				printer.filament == gcode.Filament.Material) &&
+				printer.GetStatus() == Standby {
+				//-----------------------------------------------------------------------------
+				// Printer status is updated in HandlePrintRequest(). Since
+				// loop frequency is at per 10s, No chance of two jobs being
+				// sent to same printer
+				go printer.HandlePrintRequest(gcode)
 
-				go printerArray[i].HandlePrintRequest(gcode)
+				// Set gcode file status to 1
+				gcode.SetStatus(GcodePrinting)
 
-				// Set gcode file status to 2 locally
-				gcode.Status = 2
-
-				// Set file status code to 2 in database, we need the JobId,
-				// and the FileIndex. Pass as argument local gcode file
+				// Set file status code to 2 in database. Pass as argument
+				// local gcode file, which contains the file's index and JobId
 				updateFileStatus(gcode, ctx, client)
 			}
 
-			// If none of the printers can handle the file, but there is an idle,
-			// printer, call sendFilamentRequest() for that printer and wait for
-			// response
+			// If none of the printers can handle the file, but there is an
+			// idle, printer, call sendFilamentRequest() for that printer and
+			// wait for response
 
 			// If none can handle, just reloop again.
 		}
