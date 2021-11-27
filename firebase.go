@@ -207,7 +207,7 @@ func managePrintJobs(ctx context.Context, client *firestore.Client) {
 			if printerArray[i].color == gcode.Filament.Color &&
 				printerArray[i].filament == gcode.Filament.Material {
 
-				printerArray[i].HandlePrintRequest(gcode)
+				go printerArray[i].HandlePrintRequest(gcode)
 
 				// Set gcode file status to 2 locally
 				gcode.Status = 2
