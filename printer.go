@@ -23,6 +23,8 @@ const completed = 2
 const canceled = 4
 const e = 9
 
+const setup = 5
+
 type Print struct {
 	host       string
 	port       string
@@ -191,13 +193,22 @@ func (p *Print) Upload_file(gcodeFile GcodeFile) {
 	p.print_flag = false
 }
 
+func (p *Print) setStatus(status uint) {
+	p.status = int(status)
+}
+
 // pass off gcode file for printer to handle
 func (p *Print) HandlePrintRequest(gcodeFile GcodeFile) {
 
 	// set this printer to busy
+	p.setStatus(setup)
 
-	// upload the file
+	// upload the file ASYNC
 	p.Upload_file(gcodeFile)
+
+	for {
+		// Once file is uploaded break
+	}
 
 	// prompt the printer technician, and wait for print start confirmation
 	p.Set_pending_notification()
