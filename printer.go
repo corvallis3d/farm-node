@@ -22,6 +22,7 @@ type Print struct {
 	job_path   string
 	filament   string
 	color      string
+	status     int
 	recv_flag  bool // recv_flag will allow received messages to be printed. TODO
 	print_flag bool
 	done       chan struct{}
@@ -33,6 +34,7 @@ func NewPrinter(host string, port string) *Print {
 	p.port = port
 	p.recv_flag = true
 	p.print_flag = false
+	p.status = 0
 	return p
 }
 
@@ -62,9 +64,24 @@ func (p *Print) Start_receive_thread() {
 				log.Print(err)
 				continue
 			}
+      
+			p.Process_received_data(*data)
+			fmt.Print("\nprinter status:", p.status)
+			fmt.Print("\n")
+
 			data.Print_jsonrpc_data()
 		}
 	}()
+}
+
+
+func (p *Print) Process_received_data(data Jsonrpc) {
+	switch data.Id {
+	case ID_GET_PRINT_JOB_STATUS:
+		result_object := data.Result.(Result_object)
+		p.status = result_object.get_status_code()
+	default:
+	}
 }
 
 func (p *Print) Send_jsonrpc(data Jsonrpc) {
@@ -75,47 +92,53 @@ func (p *Print) Send_jsonrpc(data Jsonrpc) {
 	}
 }
 
-func (p *Print) Get_printer_status() {
+func (p *Print) Set_pending_notification() {
+	fmt.Print("\n ############## FILE_PENDING_NOTIFICATION ###############\n")
+	p.Request_gcode_script(ID_FILE_PENDING_NOTIFICATION, "FILE_PENDING_NOTIFICATION")
+}
+
+func (p *Print) Set_default_display() {
+	fmt.Print("\n ############## DESKTOP CHANGE ###############\n")
+	p.Request_gcode_script(ID_DEFAULT_DISPLAY, "DEFAULT_DISPLAY")
+}
+
+func (p *Print) Set_notification_string(s string) {
+	fmt.Print("\n ############## NOTIFICATION ###############\n")
+	s = "SEND_STRING STR=" + `"` + s + `"`
+	p.Request_gcode_script(ID_CUSTOM_NOTIFICATION, s)
+}
+
+func (p *Print) Request_gcode_script(id int, s string) {
+	msg := New_jsonrpc()
+	msg.Add_method("printer.gcode.script")
+	msg.Add_id(id)
+	msg.Add_params_script(s)
+	p.Send_jsonrpc(msg)
+}
+
+func (p *Print) Request_print_status() {
+	fmt.Print("\n ############## PRINT STATSSSSSSS ###############\n")
+	msg := New_jsonrpc()
+	msg.Add_method("printer.objects.query")
+	msg.Add_id(ID_GET_PRINT_JOB_STATUS)
+	msg.Adds_params_objects()
+	p.Send_jsonrpc(msg)
+}
+
+func (p *Print) Request_klipper_status() {
 	fmt.Print("\n ############## GET PRINTER STATUS ###############\n")
 	msg := New_jsonrpc()
 	msg.Add_method("printer.info")
-	msg.Add_id(8888)
+	msg.Add_id(ID_GET_KLIPPER_STATUS)
 	p.Send_jsonrpc(msg)
-}
-
-func (p *Print) Send_print_notification() {
-	fmt.Print("\n ############## FILE_PENDING_NOTIFICATION ###############\n")
-	p.Send_gcode_script("FILE_PENDING_NOTIFICATION")
-}
-
-func (p *Print) Default_display() {
-	fmt.Print("\n ############## DESKTOP CHANGE ###############\n")
-	p.Send_gcode_script("DEFAULT_DISPLAY")
-}
-
-func (p *Print) Change_notification_string(s string) {
-	s = "SEND_STRING STR=" + `"` + s + `"`
-	fmt.Print("\n ############## NOTIFICATION ###############\n")
-	p.Send_gcode_script(s)
-
-}
-
-func (p *Print) Send_gcode_script(s string) {
-	msg := New_jsonrpc()
-	msg.Add_method("printer.gcode.script")
-	msg.Add_id(1111)
-	msg.Add_params_script(s)
-	p.Send_jsonrpc(msg)
-
 }
 
 func (p *Print) Start_filename_print(s string) {
 	msg := New_jsonrpc()
 	msg.Add_method("printer.print.start")
-	msg.Add_id(1234)
+	msg.Add_id(ID_START_FILENAME_PRINT)
 	msg.Add_params_filename(s)
 	p.Send_jsonrpc(msg)
-
 }
 
 func (p *Print) Upload_file(gcodeFile GcodeFile) {
