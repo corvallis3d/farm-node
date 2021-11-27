@@ -15,20 +15,6 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-type Printer interface {
-	NewPrinter()
-	Connect()
-	Start_receive_thread()
-	Send_msg()
-	Send_print_notification()
-	Change_notification_string(s string)
-	Default_display()
-	Upload_file(file_name string)
-	Start_print()
-	// Print_json_rpc(data json_rpc_data)
-	Get_printer_status()
-}
-
 type Print struct {
 	host       string
 	port       string
@@ -36,6 +22,7 @@ type Print struct {
 	job_path   string
 	filament   string
 	color      string
+	status     int
 	recv_flag  bool // recv_flag will allow received messages to be printed. TODO
 	print_flag bool
 	done       chan struct{}
@@ -47,11 +34,8 @@ func NewPrinter(host string, port string) *Print {
 	p.port = port
 	p.recv_flag = true
 	p.print_flag = false
+	p.status = 0
 	return p
-}
-
-func (p *Print) sendFilamentRequest(gcode GcodeFile) {
-	p.Upload_file(gcode)
 }
 
 func (p *Print) Connect() {
@@ -75,132 +59,93 @@ func (p *Print) Start_receive_thread() {
 				log.Println("read:", err)
 				return
 			}
-
-			// data := New_rpc_req_p()
-			// err = json.Unmarshal(message, &data)
-			// if err != nil {
-			// 	log.Fatal(err)
-			// }
+			data, err := JSON_Unmarshal(message)
+			if err != nil {
+				log.Print(err)
+				continue
+			}
+			p.Process_received_data(*data)
+			fmt.Print("\nprinter status:", p.status)
 			fmt.Print("\n")
-			p.Process_message(string(message))
-
-			// p.Print_json_rpc(data)
+			data.Print_jsonrpc_data()
 		}
 	}()
 }
 
-func (p *Print) Process_message(msg string) {
-	log.Print("\n", string(msg))
-
+func (p *Print) Process_received_data(data Jsonrpc) {
+	switch data.Id {
+	case ID_GET_PRINT_JOB_STATUS:
+		result_object := data.Result.(Result_object)
+		p.status = result_object.get_status_code()
+	default:
+	}
 }
 
-// func (p *Print) Print_json_rpc(data Json_rpc_req) {
-// 	if data.Method != "" {
-// 		fmt.Printf("Method: %s\n", data.Method)
-// 	}
-// 	if data.Method != "notify_proc_stat_update" && data.Params != nil {
-// 		fmt.Printf("Params: %s\n", data.Params)
-// 	}
-// 	if data.Result != "" {
-// 		fmt.Printf("Resut: %s\n", data.Result)
-// 	}
-// 	if data.Error.Message != "" {
-// 		fmt.Printf("Error: %s\n", data.Error.Message)
-// 	}
-// 	if data.Id != 0 {
-// 		fmt.Printf("Id: %d\n", data.Id)
-// 	}
-// }
-
-// func (p *Print) Is_printer_ready(msg json_rpc_data) {
-// 	if compare, ok := msg.Params.([]interface{}); ok {
-// 		if compare[len(compare)-1] == "// printer_ready" {
-// 			p.print_flag = true
-// 		}
-// 	}
-// }
-
-func (p *Print) Send_msg(msg string) {
-	var payload = []byte(msg)
-	err := p.ws.WriteMessage(websocket.TextMessage, payload)
+func (p *Print) Send_jsonrpc(data Jsonrpc) {
+	err := p.ws.WriteJSON(data)
 	if err != nil {
 		log.Println("write:", err)
 		return
 	}
 }
 
-func (p *Print) Send_print_notification() {
-	msg :=
-		`{
-			"jsonrpc": "2.0",
-			"method": "printer.gcode.script",
-			"params": {
-				"script": "FILE_PENDING_NOTIFICATION"
-			},
-			"id": 7466
-			}`
-	p.Send_msg(msg)
+func (p *Print) Set_pending_notification() {
+	fmt.Print("\n ############## FILE_PENDING_NOTIFICATION ###############\n")
+	p.Request_gcode_script(ID_FILE_PENDING_NOTIFICATION, "FILE_PENDING_NOTIFICATION")
 }
 
-func (p *Print) Default_display() {
-	msg :=
-		`{
-			"jsonrpc": "2.0",
-			"method": "printer.gcode.script",
-			"params": {
-				"script": "DEFAULT_DISPLAY"
-			},
-			"id": 7466
-			}`
-	p.Send_msg(msg)
+func (p *Print) Set_default_display() {
+	fmt.Print("\n ############## DESKTOP CHANGE ###############\n")
+	p.Request_gcode_script(ID_DEFAULT_DISPLAY, "DEFAULT_DISPLAY")
 }
 
-func (p *Print) Change_notification_string(s string) {
-	s = "'" + s + "'"
-	msg :=
-		`{
-			"jsonrpc": "2.0",
-			"method": "printer.gcode.script",
-			"params": {
-				"script": "SEND_STRING STR=` + s + `"
-			},
-			"id": 7466
-			}`
-	p.Send_msg(msg)
+func (p *Print) Set_notification_string(s string) {
+	fmt.Print("\n ############## NOTIFICATION ###############\n")
+	s = "SEND_STRING STR=" + `"` + s + `"`
+	p.Request_gcode_script(ID_CUSTOM_NOTIFICATION, s)
 }
 
-func (p *Print) Start_print() {
-	msg := `{
-			"jsonrpc": "2.0",
-			"method": "printer.print.start",
-			"params": {
-				"filename": "testing.gcode"
-			},
-			"id": 4654
-		}`
-	p.Send_msg(msg)
-	p.print_flag = false
+func (p *Print) Request_gcode_script(id int, s string) {
+	msg := New_jsonrpc()
+	msg.Add_method("printer.gcode.script")
+	msg.Add_id(id)
+	msg.Add_params_script(s)
+	p.Send_jsonrpc(msg)
 }
 
-func (p *Print) Get_printer_status() {
-	fmt.Print("\nAAAAAAAAAAAAAAAAAAAAAAa")
-	msg := New_rpc_req()
-	msg.Method = "printer.info"
-	msg.Id = 1988
-	err := p.ws.WriteJSON(msg)
-	if err != nil {
-		log.Println("write:", err)
-		return
-	}
+func (p *Print) Request_print_status() {
+	fmt.Print("\n ############## PRINT STATSSSSSSS ###############\n")
+	msg := New_jsonrpc()
+	msg.Add_method("printer.objects.query")
+	msg.Add_id(ID_GET_PRINT_JOB_STATUS)
+	msg.Adds_params_objects()
+	p.Send_jsonrpc(msg)
 }
 
-func (p *Print) Upload_file(gcode GcodeFile) {
+func (p *Print) Request_klipper_status() {
+	fmt.Print("\n ############## GET PRINTER STATUS ###############\n")
+	msg := New_jsonrpc()
+	msg.Add_method("printer.info")
+	msg.Add_id(ID_GET_KLIPPER_STATUS)
+	p.Send_jsonrpc(msg)
+}
+
+func (p *Print) Start_filename_print(s string) {
+	msg := New_jsonrpc()
+	msg.Add_method("printer.print.start")
+	msg.Add_id(ID_START_FILENAME_PRINT)
+	msg.Add_params_filename(s)
+	p.Send_jsonrpc(msg)
+}
+
+func (p *Print) Upload_file(file_name string) {
 	url := url.URL{Scheme: "http", Host: p.host + ":" + p.port, Path: "/server/files/upload"}
 	payload := &bytes.Buffer{}
 	writer := multipart.NewWriter(payload)
-	file, errFile1 := os.Open(fmt.Sprintf("C:/Models/Processed Orders/Order #%s - First Last/Upload-Gcode/%s", gcode.JobId, gcode.Filename))
+	file, errFile1 := os.Open(fmt.Sprintf("./gcode/%s", file_name))
 	defer file.Close()
-	part1, errFile1 := writer.CreateFormFile("file", filepath.Base(fmt.Sprintf("C:/Models/Processed Orders/Order #%s - First Last/Upload-Gcode/%s", gcode.JobId, gcode.Filename)))
+	part1,
+		errFile1 := writer.CreateFormFile("file", filepath.Base(fmt.Sprintf("./gcode/%s", file_name)))
 	_, errFile1 = io.Copy(part1, file)
 	if errFile1 != nil {
 		fmt.Println(errFile1)
