@@ -12,6 +12,15 @@ import (
 	"google.golang.org/api/option"
 )
 
+const GcodePrintSuccess = 2
+const GcodePrinting = 1
+const GcodeIdle = 0
+const GcodeError = 9
+
+const JobIdle = 0
+const JobInProgress = 1
+const JobCompleted = 2
+
 var jobs = []Job{}
 var printerArray []Print
 
@@ -198,7 +207,7 @@ func managePrintJobs(ctx context.Context, client *firestore.Client) {
 			if printerArray[i].color == gcode.Filament.Color &&
 				printerArray[i].filament == gcode.Filament.Material {
 
-				printerArray[i].sendFilamentRequest(gcode)
+				printerArray[i].HandlePrintRequest(gcode)
 
 				// Set gcode file status to 2 locally
 				gcode.Status = 2
