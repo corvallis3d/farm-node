@@ -8,6 +8,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 )
 
+
 // Global variables for Json RPC request IDs
 var ID_DEFAULT_DISPLAY = 1000
 var ID_CUSTOM_NOTIFICATION = 2222
@@ -16,6 +17,7 @@ var ID_GET_KLIPPER_STATUS = 3330
 var ID_GET_PRINTER_STATUS = 3331
 var ID_GET_PRINT_JOB_STATUS = 7777
 var ID_START_FILENAME_PRINT = 5555
+
 
 type Jsonrpc struct {
 	Jsonrpc string       `json:"jsonrpc,omitempty"`
@@ -162,6 +164,7 @@ func (p *Jsonrpc) Add_id(id int) {
 	p.Id = id
 }
 
+
 func (p *Jsonrpc) Add_params_script(script string) {
 	Params_object := new(Params_object)
 	Params_object.Script = script
@@ -173,6 +176,7 @@ func (p *Jsonrpc) Add_params_filename(filename string) {
 	Params_object.Filename = filename
 	p.Params = *Params_object
 }
+
 
 /* Creates the following struct for the Params field of a Jsonrpc object
 {

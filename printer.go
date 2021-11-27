@@ -64,13 +64,16 @@ func (p *Print) Start_receive_thread() {
 				log.Print(err)
 				continue
 			}
+      
 			p.Process_received_data(*data)
 			fmt.Print("\nprinter status:", p.status)
 			fmt.Print("\n")
+
 			data.Print_jsonrpc_data()
 		}
 	}()
 }
+
 
 func (p *Print) Process_received_data(data Jsonrpc) {
 	switch data.Id {
@@ -138,14 +141,14 @@ func (p *Print) Start_filename_print(s string) {
 	p.Send_jsonrpc(msg)
 }
 
-func (p *Print) Upload_file(file_name string) {
+func (p *Print) Upload_file(gcodeFile GcodeFile) {
 	url := url.URL{Scheme: "http", Host: p.host + ":" + p.port, Path: "/server/files/upload"}
 	payload := &bytes.Buffer{}
 	writer := multipart.NewWriter(payload)
-	file, errFile1 := os.Open(fmt.Sprintf("./gcode/%s", file_name))
+	file, errFile1 := os.Open(fmt.Sprintf("C:/Models/Processed Orders/Order #%s - First Last/Upload-Gcode/%s", gcodeFile.JobId, gcodeFile.Filename))
 	defer file.Close()
 	part1,
-		errFile1 := writer.CreateFormFile("file", filepath.Base(fmt.Sprintf("./gcode/%s", file_name)))
+		errFile1 := writer.CreateFormFile("file", filepath.Base(fmt.Sprintf("C:/Models/Processed Orders/Order #%s - First Last/Upload-Gcode/%s", gcodeFile.JobId, gcodeFile.Filename)))
 	_, errFile1 = io.Copy(part1, file)
 	if errFile1 != nil {
 		fmt.Println(errFile1)
