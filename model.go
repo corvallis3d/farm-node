@@ -27,3 +27,7 @@ type MaxDim struct {
 	Length float64 `firestore:"length"`
 	Width  float64 `firestore:"width"`
 }
+
+func (g *GcodeFile) SetStatus(status int) {
+	g.Status = status
+}

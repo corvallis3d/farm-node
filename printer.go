@@ -16,14 +16,14 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-const standby = 0
-const printing = 1
-const paused = 3
-const completed = 2
-const canceled = 4
-const e = 9
+const Standby = 0
+const Printing = 1
+const Paused = 3
+const Completed = 2
+const Canceled = 4
+const E = 9
 
-const setup = 5
+const Setup = 5
 
 type Print struct {
 	host       string
@@ -58,7 +58,7 @@ func (p *Print) Connect() {
 	}
 }
 
-func (p *Print) Start_receive_thread() {
+func (p *Print) StartReceiveThread() {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
@@ -75,7 +75,7 @@ func (p *Print) Start_receive_thread() {
 				continue
 			}
 
-			p.Process_received_data(*data)
+			p.ProcessReceivedData(*data)
 			fmt.Print("\nprinter status:", p.status)
 			fmt.Print("\n")
 
@@ -84,7 +84,7 @@ func (p *Print) Start_receive_thread() {
 	}()
 }
 
-func (p *Print) Process_received_data(data Jsonrpc) {
+func (p *Print) ProcessReceivedData(data Jsonrpc) {
 	switch data.Id {
 	case ID_GET_PRINT_JOB_STATUS:
 		result_object := data.Result.(Result_object)
@@ -93,7 +93,7 @@ func (p *Print) Process_received_data(data Jsonrpc) {
 	}
 }
 
-func (p *Print) Send_jsonrpc(data Jsonrpc) {
+func (p *Print) SendJsonrpc(data Jsonrpc) {
 	err := p.ws.WriteJSON(data)
 	if err != nil {
 		log.Println("write:", err)
@@ -101,56 +101,56 @@ func (p *Print) Send_jsonrpc(data Jsonrpc) {
 	}
 }
 
-func (p *Print) Set_pending_notification() {
+func (p *Print) SetPendingNotification() {
 	fmt.Print("\n ############## FILE_PENDING_NOTIFICATION ###############\n")
-	p.Request_gcode_script(ID_FILE_PENDING_NOTIFICATION, "FILE_PENDING_NOTIFICATION")
+	p.RequestGcodeScript(ID_FILE_PENDING_NOTIFICATION, "FILE_PENDING_NOTIFICATION")
 }
 
-func (p *Print) Set_default_display() {
+func (p *Print) SetDefaultDisplay() {
 	fmt.Print("\n ############## DESKTOP CHANGE ###############\n")
-	p.Request_gcode_script(ID_DEFAULT_DISPLAY, "DEFAULT_DISPLAY")
+	p.RequestGcodeScript(ID_DEFAULT_DISPLAY, "DEFAULT_DISPLAY")
 }
 
-func (p *Print) Set_notification_string(s string) {
+func (p *Print) SetNotificationString(s string) {
 	fmt.Print("\n ############## NOTIFICATION ###############\n")
 	s = "SEND_STRING STR=" + `"` + s + `"`
-	p.Request_gcode_script(ID_CUSTOM_NOTIFICATION, s)
+	p.RequestGcodeScript(ID_CUSTOM_NOTIFICATION, s)
 }
 
-func (p *Print) Request_gcode_script(id int, s string) {
+func (p *Print) RequestGcodeScript(id int, s string) {
 	msg := New_jsonrpc()
 	msg.Add_method("printer.gcode.script")
 	msg.Add_id(id)
 	msg.Add_params_script(s)
-	p.Send_jsonrpc(msg)
+	p.SendJsonrpc(msg)
 }
 
-func (p *Print) Request_print_status() {
+func (p *Print) RequestPrintStatus() {
 	fmt.Print("\n ############## PRINT STATSSSSSSS ###############\n")
 	msg := New_jsonrpc()
 	msg.Add_method("printer.objects.query")
 	msg.Add_id(ID_GET_PRINT_JOB_STATUS)
 	msg.Adds_params_objects()
-	p.Send_jsonrpc(msg)
+	p.SendJsonrpc(msg)
 }
 
-func (p *Print) Request_klipper_status() {
+func (p *Print) RequestKlipperStatus() {
 	fmt.Print("\n ############## GET PRINTER STATUS ###############\n")
 	msg := New_jsonrpc()
 	msg.Add_method("printer.info")
 	msg.Add_id(ID_GET_KLIPPER_STATUS)
-	p.Send_jsonrpc(msg)
+	p.SendJsonrpc(msg)
 }
 
-func (p *Print) Start_filename_print(s string) {
+func (p *Print) StartFilenamePrint(s string) {
 	msg := New_jsonrpc()
 	msg.Add_method("printer.print.start")
 	msg.Add_id(ID_START_FILENAME_PRINT)
 	msg.Add_params_filename(s)
-	p.Send_jsonrpc(msg)
+	p.SendJsonrpc(msg)
 }
 
-func (p *Print) Upload_file(gcodeFile GcodeFile) {
+func (p *Print) UploadFile(gcodeFile GcodeFile) {
 	url := url.URL{Scheme: "http", Host: p.host + ":" + p.port, Path: "/server/files/upload"}
 	payload := &bytes.Buffer{}
 	writer := multipart.NewWriter(payload)
@@ -193,54 +193,56 @@ func (p *Print) Upload_file(gcodeFile GcodeFile) {
 	p.print_flag = false
 }
 
-func (p *Print) setStatus(status uint) {
+func (p *Print) SetStatus(status uint) {
 	p.status = int(status)
+}
+
+func (p *Print) GetStatus() int {
+	return p.status
 }
 
 // pass off gcode file for printer to handle
 func (p *Print) HandlePrintRequest(gcodeFile GcodeFile) {
 
 	// set this printer to busy
-	p.setStatus(setup)
+	p.SetStatus(Setup)
 
 	// upload the file ASYNC
-	p.Upload_file(gcodeFile)
+	p.UploadFile(gcodeFile)
 
 	for {
 		// Once file is uploaded break
+		break
 	}
 
 	// prompt the printer technician, and wait for print start confirmation
-	p.Set_pending_notification()
-
+	p.SetPendingNotification()
 	// placeholder
 	proceedWithPrint := true
 
 	if proceedWithPrint {
 		// start the print
-		p.Start_filename_print(gcodeFile.Filename)
+		p.StartFilenamePrint(gcodeFile.Filename)
 
 		for range time.Tick(time.Second * 30) {
 
 			// poll for print status per 30 seconds
-
 			// placeholder
-			printStatus := standby
-			// printStatus := p.get_status()
+			printStatus := p.GetStatus()
 
-			// if print_status is success
-			// if print_status is fail
-			// if print_status is in progress
-			if printStatus == standby {
-				fmt.Println("Stanby")
-			} else if printStatus == paused {
-				fmt.Println("Paused")
-			} else if printStatus == completed {
-				fmt.Println("Completed")
-			} else if printStatus == canceled {
-				fmt.Println("Canceled")
-			} else if printStatus == e {
-				fmt.Println("Error")
+			//-----------------------------------------------------------------------------
+			// only have to handle Completed, Paused, Canceled, Error
+			if printStatus == Completed {
+				// Wait until technician removes print, resets printer status to standby
+
+			} else if printStatus == Paused {
+
+			} else if printStatus == Canceled {
+
+			} else if printStatus == E {
+
+			} else {
+				continue
 			}
 		}
 	}
