@@ -11,9 +11,17 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
+
+const standby = 0
+const printing = 1
+const paused = 3
+const completed = 2
+const canceled = 4
+const e = 9
 
 type Print struct {
 	host       string
@@ -159,4 +167,48 @@ func (p *Print) Upload_file(gcodeFile GcodeFile) {
 	}
 	fmt.Println(string(body))
 	p.print_flag = false
+}
+
+// pass off gcode file for printer to handle
+func (p *Print) HandlePrintRequest(gcodeFile GcodeFile) {
+
+	// set this printer to busy
+
+	// upload the file
+	p.Upload_file(gcodeFile)
+
+	// prompt the printer technician, and wait for print start confirmation
+	p.Send_print_notification()
+
+	// placeholder
+	proceedWithPrint := true
+
+	if proceedWithPrint {
+		// start the print
+		p.Start_filename_print(gcodeFile.Filename)
+
+		for range time.Tick(time.Second * 30) {
+
+			// poll for print status per 30 seconds
+
+			// placeholder
+			printStatus := standby
+			// printStatus := p.get_status()
+
+			// if print_status is success
+			// if print_status is fail
+			// if print_status is in progress
+			if printStatus == standby {
+				fmt.Println("Stanby")
+			} else if printStatus == paused {
+				fmt.Println("Paused")
+			} else if printStatus == completed {
+				fmt.Println("Completed")
+			} else if printStatus == canceled {
+				fmt.Println("Canceled")
+			} else if printStatus == e {
+				fmt.Println("Error")
+			}
+		}
+	}
 }
