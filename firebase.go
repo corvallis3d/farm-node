@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"cloud.google.com/go/firestore"
@@ -12,9 +13,10 @@ import (
 	"google.golang.org/api/option"
 )
 
-const GcodePrintSuccess = 2
-const GcodePrinting = 1
 const GcodeIdle = 0
+const GcodePrinting = 1
+const GcodePrintSuccess = 2
+const GcodeCanceled = 3
 const GcodeError = 9
 
 const JobIdle = 0
@@ -152,7 +154,7 @@ func updatePrinterStatus() {
 
 // Update status for a single Gcode file in database
 // Copies whole doc, modifes, then replaces
-func updateFileStatus(gcode GcodeFile, ctx context.Context, client *firestore.Client) {
+func UpdateFileStatus(gcode GcodeFile, ctx context.Context, client *firestore.Client) {
 	jobId := gcode.JobId
 	fileIndex := gcode.FileIndex
 
@@ -193,9 +195,13 @@ func managePrintJobs(ctx context.Context, client *firestore.Client) {
 			continue
 		}
 
+		var m sync.Mutex
+
+		m.Lock()
 		// First Gcode file popped from queue
 		gcode := gcodeQueue[0]
 		gcodeQueue = gcodeQueue[1:]
+		m.Unlock()
 
 		updatePrinterStatus()
 
@@ -215,14 +221,14 @@ func managePrintJobs(ctx context.Context, client *firestore.Client) {
 				// Printer status is updated in HandlePrintRequest(). Since
 				// loop frequency is at per 10s, No chance of two jobs being
 				// sent to same printer
-				go printer.HandlePrintRequest(gcode)
+				go printer.HandlePrintRequest(gcode, ctx, client)
 
 				// Set gcode file status to 1
 				gcode.SetStatus(GcodePrinting)
 
 				// Set file status code to 2 in database. Pass as argument
 				// local gcode file, which contains the file's index and JobId
-				updateFileStatus(gcode, ctx, client)
+				UpdateFileStatus(gcode, ctx, client)
 			}
 
 			// If none of the printers can handle the file, but there is an

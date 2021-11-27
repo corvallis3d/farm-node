@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -11,19 +12,21 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"time"
 
+	"cloud.google.com/go/firestore"
 	"github.com/gorilla/websocket"
 )
 
 const Standby = 0
+const Completed = 2
 const Printing = 1
 const Paused = 3
-const Completed = 2
 const Canceled = 4
-const E = 9
-
 const Setup = 5
+const Resetting = 6
+const E = 9
 
 type Print struct {
 	host       string
@@ -202,20 +205,15 @@ func (p *Print) GetStatus() int {
 }
 
 // pass off gcode file for printer to handle
-func (p *Print) HandlePrintRequest(gcodeFile GcodeFile) {
+func (p *Print) HandlePrintRequest(gcodeFile GcodeFile, ctx context.Context, client *firestore.Client) {
 
 	// set this printer to busy
 	p.SetStatus(Setup)
-
 	// upload the file ASYNC
 	p.UploadFile(gcodeFile)
 
-	for {
-		// Once file is uploaded break
-		break
-	}
-
 	// prompt the printer technician, and wait for print start confirmation
+	// channels
 	p.SetPendingNotification()
 	// placeholder
 	proceedWithPrint := true
@@ -226,18 +224,48 @@ func (p *Print) HandlePrintRequest(gcodeFile GcodeFile) {
 
 		for range time.Tick(time.Second * 30) {
 
-			// poll for print status per 30 seconds
-			// placeholder
+			// return an int, needs WaitGroup to ensure status is accurate
+			p.RequestPrintStatus()
+
 			printStatus := p.GetStatus()
 
 			//-----------------------------------------------------------------------------
 			// only have to handle Completed, Paused, Canceled, Error
 			if printStatus == Completed {
-				// Wait until technician removes print, resets printer status to standby
+
+				p.SetStatus(Resetting)
+
+				// update gcode file status locally
+				gcodeFile.SetStatus(GcodePrintSuccess)
+
+				// update the gcode file status
+				UpdateFileStatus(gcodeFile, ctx, client)
+
+				// Wait until technician removes print, reset printer status to standby
+				// WaitGroup here
+				p.waitForTechnicianToConfirmPrinterIsOnStandby()
+
+				// close this goroutine
+				runtime.Goexit()
 
 			} else if printStatus == Paused {
+				// Send prompt to technician, to resume print or to cancel print
+				// placeholder
+				resumePrint := false
 
+				for {
+					if resumePrint {
+						break
+					}
+				}
 			} else if printStatus == Canceled {
+				// set printer status to resetting
+				p.SetStatus(Resetting)
+				// update gcode file status locally
+				gcodeFile.SetStatus(GcodeCanceled)
+
+				// update the gcode file status
+				UpdateFileStatus(gcodeFile, ctx, client)
 
 			} else if printStatus == E {
 
