@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/firestore"
@@ -67,9 +68,6 @@ func (p *Print) StartReceiveThread() {
 			}
 
 			p.ProcessReceivedData(*data)
-			// fmt.Print("\nprinter status:", p.status)
-			// fmt.Print("\n")
-
 		}
 	}()
 }
@@ -92,13 +90,13 @@ func (p *Print) ProcessReceivedData(data Jsonrpc) {
 }
 
 func (p *Print) ProcessGcodeResponse(res string) {
-	log.Print(res)
-	if res == "// 1.0" {
-		p.IdleFlag = true
-	} else {
-		p.IdleFlag = false
+	if strings.Contains(res, "IdleFlag:") {
+		if res == "// 1.0" {
+			p.IdleFlag = true
+		} else {
+			p.IdleFlag = false
+		}
 	}
-
 }
 
 func (p *Print) SendJsonrpc(data Jsonrpc) {
@@ -109,20 +107,16 @@ func (p *Print) SendJsonrpc(data Jsonrpc) {
 	}
 }
 
-func (p *Print) SetPendingNotification() {
-	fmt.Print("\n ############## FILE_PENDING_NOTIFICATION ###############\n")
-	p.RequestGcodeScript(ID_FILE_PENDING_NOTIFICATION, "FILE_PENDING_NOTIFICATION")
+func (p *Print) SetDisplayNotification(gcodeFile GcodeFile) {
+	s := "DISPLAY_NOTIFICATION "
+	s = s + `NAME="` + gcodeFile.Filename + `"`
+	s = s + ` COLOR="` + gcodeFile.Color + `"`
+	s = s + ` MATERIAL="` + gcodeFile.Material + `"`
+	p.RequestGcodeScript(ID_FILE_PENDING_NOTIFICATION, s)
 }
 
 func (p *Print) SetDefaultDisplay() {
-	fmt.Print("\n ############## DESKTOP CHANGE ###############\n")
-	p.RequestGcodeScript(ID_DEFAULT_DISPLAY, "DEFAULT_DISPLAY")
-}
-
-func (p *Print) SetNotificationString(s string) {
-	fmt.Print("\n ############## NOTIFICATION ###############\n")
-	s = "SEND_STRING STR=" + `"` + s + `"`
-	p.RequestGcodeScript(ID_CUSTOM_NOTIFICATION, s)
+	p.RequestGcodeScript(ID_DEFAULT_DISPLAY, "DISPLAY_DEFAULT")
 }
 
 func (p *Print) RequestGcodeScript(id int, s string) {
@@ -217,12 +211,12 @@ func (p *Print) HandlePrintRequest(gcodeFile GcodeFile, ctx context.Context, cli
 
 	// set this printer to busy
 	p.SetStatus(Setup)
-	// upload the file ASYNC
+	// upload the file
 	p.UploadFile(gcodeFile)
 
 	// prompt the printer technician, and wait for print start confirmation
 	// channels
-	p.SetPendingNotification()
+	p.SetDisplayNotification(gcodeFile)
 
 	// If printer is idle, GetIdleFlag==True, stay in for loop
 	for p.GetIdleFlag() {
