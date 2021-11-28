@@ -37,6 +37,8 @@ func NewPrinter(host string, port string) *Print {
 	p.Host = host
 	p.Port = port
 	p.Status = Standby
+	p.Connect()
+	p.StartReceiveThread()
 	return p
 }
 
