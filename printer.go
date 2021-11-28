@@ -21,27 +21,27 @@ import (
 )
 
 type Print struct {
-	host     string
-	port     string
-	ws       *websocket.Conn
-	job_path string
-	filament string
-	color    string
-	status   int
-	IdleFlag bool
-	done     chan struct{}
+	Host             string
+	Port             string
+	ws               *websocket.Conn
+	JobPath          string
+	LastUsedMaterial string
+	LastUsedColor    string
+	Status           int
+	IdleFlag         bool
+	done             chan struct{}
 }
 
 func NewPrinter(host string, port string) *Print {
 	p := new(Print)
-	p.host = host
-	p.port = port
-	p.status = 0
+	p.Host = host
+	p.Port = port
+	p.Status = Standby
 	return p
 }
 
 func (p *Print) Connect() {
-	u := url.URL{Scheme: "ws", Host: p.host + ":" + p.port, Path: "/websocket"}
+	u := url.URL{Scheme: "ws", Host: p.Host + ":" + p.Port, Path: "/websocket"}
 	log.Printf("connecting to %s", u.String())
 	var err error
 	p.ws, _, err = websocket.DefaultDialer.Dial(u.String(), nil)
@@ -55,47 +55,49 @@ func (p *Print) StartReceiveThread() {
 	go func() {
 		defer close(done)
 		for {
-
 			_, message, err := p.ws.ReadMessage()
 			if err != nil {
 				log.Println("read:", err)
 				return
 			}
-			data, err := JSON_Unmarshal(message)
+			data, err := JsonUnmarshal(message)
 			if err != nil {
 				log.Print(err)
 				continue
 			}
-
 			p.ProcessReceivedData(*data)
 		}
 	}()
 }
 
 func (p *Print) ProcessReceivedData(data Jsonrpc) {
+	// Process data according to Id number
 	switch data.Id {
-	case ID_GET_PRINT_JOB_STATUS:
+	case IdPrintStatus:
 		result_object := data.Result.(Result_object)
-		p.status = result_object.get_status_code()
-	default:
+		p.Status = result_object.get_status_code()
+		return
 	}
 
+	// Process data according to method information
 	switch data.Method {
 	case "notify_proc_stat_update":
+		return
 	case "notify_gcode_response":
+		fmt.Print(p.IdleFlag)
 		p.ProcessGcodeResponse(data.Params.([]interface{})[0].(string))
-	default:
-		data.Print_jsonrpc_data()
+		return
 	}
+
+	// Print all unprocessed data
+	data.Print_jsonrpc_data()
 }
 
 func (p *Print) ProcessGcodeResponse(res string) {
-	if strings.Contains(res, "IdleFlag:") {
-		if res == "// 1.0" {
-			p.IdleFlag = true
-		} else {
-			p.IdleFlag = false
-		}
+	if strings.Contains(res, "IdleFlag:1.0") {
+		p.IdleFlag = true
+	} else if strings.Contains(res, "IdleFlag:0.0") {
+		p.IdleFlag = false
 	}
 }
 
@@ -107,59 +109,50 @@ func (p *Print) SendJsonrpc(data Jsonrpc) {
 	}
 }
 
-func (p *Print) SetDisplayNotification(gcodeFile GcodeFile) {
-	s := "DISPLAY_NOTIFICATION "
-	s = s + `NAME="` + gcodeFile.Filename + `"`
-	s = s + ` COLOR="` + gcodeFile.Color + `"`
-	s = s + ` MATERIAL="` + gcodeFile.Material + `"`
-	p.RequestGcodeScript(ID_FILE_PENDING_NOTIFICATION, s)
+func (p *Print) SetDisplayNotification(GF GcodeFile) {
+	Script := "DISPLAY_NOTIFICATION "
+	Script += `NAME="` + GF.Filename + `"`
+	Script += ` COLOR="` + GF.Color + `"`
+	Script += ` MATERIAL="` + GF.Material + `"`
+	p.RequestGcodeScript(IdDisplayNotification, Script)
 }
 
 func (p *Print) SetDefaultDisplay() {
-	p.RequestGcodeScript(ID_DEFAULT_DISPLAY, "DISPLAY_DEFAULT")
+	p.RequestGcodeScript(IdDefaultDisplay, "DISPLAY_DEFAULT")
 }
 
-func (p *Print) RequestGcodeScript(id int, s string) {
-	msg := New_jsonrpc()
-	msg.Add_method("printer.gcode.script")
-	msg.Add_id(id)
-	msg.Add_params_script(s)
-	p.SendJsonrpc(msg)
+func (p *Print) RequestGcodeScript(Id int, Script string) {
+	Jsonrpc_req := NewJsonrpc()
+	Jsonrpc_req.Add_method("printer.gcode.script")
+	Jsonrpc_req.Add_id(Id)
+	Jsonrpc_req.Add_params_script(Script)
+	p.SendJsonrpc(Jsonrpc_req)
 }
 
 func (p *Print) RequestPrintStatus() {
-	fmt.Print("\n ############## PRINT STATSSSSSSS ###############\n")
-	msg := New_jsonrpc()
-	msg.Add_method("printer.objects.query")
-	msg.Add_id(ID_GET_PRINT_JOB_STATUS)
-	msg.Adds_params_objects()
-	p.SendJsonrpc(msg)
+	Jsonrpc_req := NewJsonrpc()
+	Jsonrpc_req.Add_method("printer.objects.query")
+	Jsonrpc_req.Add_id(IdPrintStatus)
+	Jsonrpc_req.Adds_params_objects()
+	p.SendJsonrpc(Jsonrpc_req)
 }
 
-func (p *Print) RequestKlipperStatus() {
-	fmt.Print("\n ############## GET PRINTER STATUS ###############\n")
-	msg := New_jsonrpc()
-	msg.Add_method("printer.info")
-	msg.Add_id(ID_GET_KLIPPER_STATUS)
-	p.SendJsonrpc(msg)
+func (p *Print) StartFilenamePrint(FileName string) {
+	Jsonrpc_req := NewJsonrpc()
+	Jsonrpc_req.Add_method("printer.print.start")
+	Jsonrpc_req.Add_id(IdStartFileNamePrint)
+	Jsonrpc_req.Add_params_filename(FileName)
+	p.SendJsonrpc(Jsonrpc_req)
 }
 
-func (p *Print) StartFilenamePrint(s string) {
-	msg := New_jsonrpc()
-	msg.Add_method("printer.print.start")
-	msg.Add_id(ID_START_FILENAME_PRINT)
-	msg.Add_params_filename(s)
-	p.SendJsonrpc(msg)
-}
-
-func (p *Print) UploadFile(gcodeFile GcodeFile) {
-	url := url.URL{Scheme: "http", Host: p.host + ":" + p.port, Path: "/server/files/upload"}
+func (p *Print) UploadFile(GF GcodeFile) {
+	url := url.URL{Scheme: "http", Host: p.Host + ":" + p.Port, Path: "/server/files/upload"}
 	payload := &bytes.Buffer{}
 	writer := multipart.NewWriter(payload)
-	file, errFile1 := os.Open(fmt.Sprintf("C:/Models/Processed Orders/Order #%s - First Last/Upload-Gcode/%s", gcodeFile.JobId, gcodeFile.Filename))
+	file, errFile1 := os.Open(fmt.Sprintf("C:/Models/Processed Orders/Order #%s - First Last/Upload-Gcode/%s", GF.JobId, GF.Filename))
 	defer file.Close()
 	part1,
-		errFile1 := writer.CreateFormFile("file", filepath.Base(fmt.Sprintf("C:/Models/Processed Orders/Order #%s - First Last/Upload-Gcode/%s", gcodeFile.JobId, gcodeFile.Filename)))
+		errFile1 := writer.CreateFormFile("file", filepath.Base(fmt.Sprintf("C:/Models/Processed Orders/Order #%s - First Last/Upload-Gcode/%s", GF.JobId, GF.Filename)))
 	_, errFile1 = io.Copy(part1, file)
 	if errFile1 != nil {
 		fmt.Println(errFile1)
@@ -195,11 +188,11 @@ func (p *Print) UploadFile(gcodeFile GcodeFile) {
 }
 
 func (p *Print) SetStatus(status uint) {
-	p.status = int(status)
+	p.Status = int(status)
 }
 
 func (p *Print) GetStatus() int {
-	return p.status
+	return p.Status
 }
 
 func (p *Print) GetIdleFlag() bool {
@@ -207,16 +200,16 @@ func (p *Print) GetIdleFlag() bool {
 }
 
 // pass off gcode file for printer to handle
-func (p *Print) HandlePrintRequest(gcodeFile GcodeFile, ctx context.Context, client *firestore.Client) {
+func (p *Print) HandlePrintRequest(GF GcodeFile, ctx context.Context, client *firestore.Client) {
 
 	// set this printer to busy
 	p.SetStatus(Setup)
 	// upload the file
-	p.UploadFile(gcodeFile)
+	p.UploadFile(GF)
 
 	// prompt the printer technician, and wait for print start confirmation
 	// channels
-	p.SetDisplayNotification(gcodeFile)
+	p.SetDisplayNotification(GF)
 
 	// If printer is idle, GetIdleFlag==True, stay in for loop
 	for p.GetIdleFlag() {
@@ -228,7 +221,7 @@ func (p *Print) HandlePrintRequest(gcodeFile GcodeFile, ctx context.Context, cli
 
 	if proceedWithPrint {
 		// start the print
-		p.StartFilenamePrint(gcodeFile.Filename)
+		p.StartFilenamePrint(GF.Filename)
 
 		for range time.Tick(time.Second * 30) {
 
@@ -243,10 +236,10 @@ func (p *Print) HandlePrintRequest(gcodeFile GcodeFile, ctx context.Context, cli
 				p.SetStatus(Resetting)
 
 				// update gcode file status locally
-				gcodeFile.SetStatus(GcodePrintSuccess)
+				GF.SetStatus(GcodePrintSuccess)
 
 				// update the gcode file status
-				UpdateFileStatus(gcodeFile, ctx, client)
+				UpdateFileStatus(GF, ctx, client)
 
 				// Wait until technician removes print, reset printer status to standby
 				// WaitGroup here
@@ -278,10 +271,10 @@ func (p *Print) HandlePrintRequest(gcodeFile GcodeFile, ctx context.Context, cli
 				// set printer status to resetting
 				p.SetStatus(Resetting)
 				// update gcode file status locally
-				gcodeFile.SetStatus(GcodeCanceled)
+				GF.SetStatus(GcodeCanceled)
 
 				// update the gcode file status
-				UpdateFileStatus(gcodeFile, ctx, client)
+				UpdateFileStatus(GF, ctx, client)
 
 			} else if printStatus == E {
 
