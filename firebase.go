@@ -138,8 +138,6 @@ func instantiateAllPrinters() {
 		// fmt.Printf("%s, %s\n", viper.GetString(printer_host), viper.GetString(printer_port))
 
 		p := NewPrinter(viper.GetString(printer_host), viper.GetString(printer_port))
-		p.Connect()
-		p.StartReceiveThread()
 
 		printerArray = append(printerArray, *p)
 	}
@@ -188,55 +186,59 @@ func UpdateFileStatus(gcode GcodeFile, ctx context.Context, client *firestore.Cl
 }
 
 func managePrintJobs(ctx context.Context, client *firestore.Client) {
-	// Just keep looping
+
+	// Just keep looping until a GF is in queue
 	for range time.Tick(time.Second * 10) {
+
 		// if gcodeQueue is empty
 		if len(gcodeQueue) == 0 {
 			continue
 		}
 
-		var m sync.Mutex
+		gcode := popFromGcodeQueue()
+		printer := findPrinterToHandleFile(gcode)
+		assignFileToPrinter(printer, gcode, ctx, client)
 
-		m.Lock()
-		// First Gcode file popped from queue
-		gcode := gcodeQueue[0]
-		gcodeQueue = gcodeQueue[1:]
-		m.Unlock()
+	}
+}
 
+// pops gcodeFile from global GcodeFile queue
+func popFromGcodeQueue() GcodeFile {
+	var m sync.Mutex
+
+	m.Lock()
+	gcode := gcodeQueue[0]
+	gcodeQueue = gcodeQueue[1:]
+	m.Unlock()
+
+	return gcode
+}
+
+// Given a GcodeFile, return a printer to handle it
+func findPrinterToHandleFile(gcode GcodeFile) Print {
+	for {
 		updatePrinterStatus()
-
-		// We need to loop through the printers array to see if any can handle
-		// the file
 		for i := range printerArray {
-
 			printer := printerArray[i]
-
-			// A printer can handle the file if the printer's status is idle,
-			// the file's max_dim does not exceed printer dimensions, and the
-			// filament matches the filament in the gcodeFile
 			if (printer.LastUsedColor == gcode.Filament.Color &&
 				printer.LastUsedMaterial == gcode.Filament.Material) &&
 				printer.GetStatus() == Standby {
-				//-----------------------------------------------------------------------------
-				// Printer status is updated in HandlePrintRequest(). Since
-				// loop frequency is at per 10s, No chance of two jobs being
-				// sent to same printer
-				go printer.HandlePrintRequest(gcode, ctx, client)
-
-				// Set gcode file status to 1
-				gcode.SetStatus(GcodePrinting)
-
-				// Set file status code to 2 in database. Pass as argument
-				// local gcode file, which contains the file's index and JobId
-				UpdateFileStatus(gcode, ctx, client)
+				return printer
 			}
-
-			// If none of the printers can handle the file, but there is an
-			// idle, printer, call sendFilamentRequest() for that printer and
-			// wait for response
-
-			// If none can handle, just reloop again.
 		}
-		// FIFO approach. Blocks at last popped file until it can be handled.
+		for i := range printerArray {
+			printer := printerArray[i]
+			if printer.GetStatus() == Standby {
+				return printer
+			}
+		}
 	}
+}
+
+// Spins off a thread for a printer method to handle a file. Update that
+// file's status in the database
+func assignFileToPrinter(printer Print, gcode GcodeFile, ctx context.Context, client *firestore.Client) {
+	go printer.HandlePrintRequest(gcode, ctx, client)
+	gcode.SetStatus(GcodePrinting)
+	UpdateFileStatus(gcode, ctx, client)
 }
