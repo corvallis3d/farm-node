@@ -10,13 +10,10 @@ import (
 
 // Global variables for Json RPC request IDs
 const (
-	ID_DEFAULT_DISPLAY           = 1000
-	ID_CUSTOM_NOTIFICATION       = 2222
-	ID_FILE_PENDING_NOTIFICATION = 2223
-	ID_GET_KLIPPER_STATUS        = 3330
-	ID_GET_PRINTER_STATUS        = 3331
-	ID_GET_PRINT_JOB_STATUS      = 7777
-	ID_START_FILENAME_PRINT      = 5555
+	IdDefaultDisplay      = 1000
+	IdDisplayNotification = 2223
+	IdPrintStatus         = 7777
+	IdStartFileNamePrint  = 5555
 
 	Standby   = 0
 	Printing  = 1
@@ -90,7 +87,7 @@ type Print_stats_object struct {
 	Message        string  `json:"message,omitempty"`
 }
 
-func New_jsonrpc() Jsonrpc {
+func NewJsonrpc() Jsonrpc {
 	new_jsonrpc := new(Jsonrpc)
 	new_jsonrpc.Jsonrpc = "2.0"
 	return *new_jsonrpc
@@ -99,7 +96,7 @@ func New_jsonrpc() Jsonrpc {
 /*
 Unmarshals bytes to appropriate data structure
 */
-func JSON_Unmarshal(bytes []byte) (*Jsonrpc, error) {
+func JsonUnmarshal(bytes []byte) (*Jsonrpc, error) {
 	raw := new(Jsonrpc)
 	err := json.Unmarshal(bytes, &raw)
 	if err != nil {
@@ -111,7 +108,7 @@ func JSON_Unmarshal(bytes []byte) (*Jsonrpc, error) {
 		ro := new(Result_object)
 		mapstructure.Decode(v, &ro)
 		// Create fields for Status under Results_object
-		if raw.Id == ID_GET_PRINT_JOB_STATUS {
+		if raw.Id == IdPrintStatus {
 			ro.Create_status_object()
 		}
 		raw.Result = *ro

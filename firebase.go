@@ -214,8 +214,8 @@ func managePrintJobs(ctx context.Context, client *firestore.Client) {
 			// A printer can handle the file if the printer's status is idle,
 			// the file's max_dim does not exceed printer dimensions, and the
 			// filament matches the filament in the gcodeFile
-			if (printer.color == gcode.Filament.Color &&
-				printer.filament == gcode.Filament.Material) &&
+			if (printer.LastUsedColor == gcode.Filament.Color &&
+				printer.LastUsedMaterial == gcode.Filament.Material) &&
 				printer.GetStatus() == Standby {
 				//-----------------------------------------------------------------------------
 				// Printer status is updated in HandlePrintRequest(). Since
