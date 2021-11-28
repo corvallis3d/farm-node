@@ -8,16 +8,25 @@ import (
 	"github.com/mitchellh/mapstructure"
 )
 
-
 // Global variables for Json RPC request IDs
-var ID_DEFAULT_DISPLAY = 1000
-var ID_CUSTOM_NOTIFICATION = 2222
-var ID_FILE_PENDING_NOTIFICATION = 2223
-var ID_GET_KLIPPER_STATUS = 3330
-var ID_GET_PRINTER_STATUS = 3331
-var ID_GET_PRINT_JOB_STATUS = 7777
-var ID_START_FILENAME_PRINT = 5555
+const (
+	ID_DEFAULT_DISPLAY           = 1000
+	ID_CUSTOM_NOTIFICATION       = 2222
+	ID_FILE_PENDING_NOTIFICATION = 2223
+	ID_GET_KLIPPER_STATUS        = 3330
+	ID_GET_PRINTER_STATUS        = 3331
+	ID_GET_PRINT_JOB_STATUS      = 7777
+	ID_START_FILENAME_PRINT      = 5555
 
+	Standby   = 0
+	Printing  = 1
+	Completed = 2
+	Paused    = 3
+	Canceled  = 4
+	Setup     = 5
+	Resetting = 6
+	E         = 9
+)
 
 type Jsonrpc struct {
 	Jsonrpc string       `json:"jsonrpc,omitempty"`
@@ -164,7 +173,6 @@ func (p *Jsonrpc) Add_id(id int) {
 	p.Id = id
 }
 
-
 func (p *Jsonrpc) Add_params_script(script string) {
 	Params_object := new(Params_object)
 	Params_object.Script = script
@@ -176,7 +184,6 @@ func (p *Jsonrpc) Add_params_filename(filename string) {
 	Params_object.Filename = filename
 	p.Params = *Params_object
 }
-
 
 /* Creates the following struct for the Params field of a Jsonrpc object
 {
@@ -221,17 +228,17 @@ func (ro *Result_object) Create_status_object() {
 func (ro *Result_object) get_status_code() int {
 	switch ro.Status.Print_stats.State {
 	case "standby":
-		return 88
+		return Standby
 	case "printing":
-		return 1
+		return Printing
 	case "paused":
-		return 3
+		return Paused
 	case "completed":
-		return 2
+		return Completed
 	case "canceled":
-		return 4
+		return Canceled
 	case "error":
-		return 9
+		return E
 	default:
 		return -1
 	}

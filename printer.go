@@ -19,34 +19,22 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-const Standby = 0
-const Completed = 2
-const Printing = 1
-const Paused = 3
-const Canceled = 4
-const Setup = 5
-const Resetting = 6
-const E = 9
-
 type Print struct {
-	host       string
-	port       string
-	ws         *websocket.Conn
-	job_path   string
-	filament   string
-	color      string
-	status     int
-	recv_flag  bool // recv_flag will allow received messages to be printed. TODO
-	print_flag bool
-	done       chan struct{}
+	host     string
+	port     string
+	ws       *websocket.Conn
+	job_path string
+	filament string
+	color    string
+	status   int
+	IdleFlag bool
+	done     chan struct{}
 }
 
 func NewPrinter(host string, port string) *Print {
 	p := new(Print)
 	p.host = host
 	p.port = port
-	p.recv_flag = true
-	p.print_flag = false
 	p.status = 0
 	return p
 }
@@ -79,10 +67,9 @@ func (p *Print) StartReceiveThread() {
 			}
 
 			p.ProcessReceivedData(*data)
-			fmt.Print("\nprinter status:", p.status)
-			fmt.Print("\n")
+			// fmt.Print("\nprinter status:", p.status)
+			// fmt.Print("\n")
 
-			data.Print_jsonrpc_data()
 		}
 	}()
 }
@@ -94,6 +81,24 @@ func (p *Print) ProcessReceivedData(data Jsonrpc) {
 		p.status = result_object.get_status_code()
 	default:
 	}
+
+	switch data.Method {
+	case "notify_proc_stat_update":
+	case "notify_gcode_response":
+		p.ProcessGcodeResponse(data.Params.([]interface{})[0].(string))
+	default:
+		data.Print_jsonrpc_data()
+	}
+}
+
+func (p *Print) ProcessGcodeResponse(res string) {
+	log.Print(res)
+	if res == "// 1.0" {
+		p.IdleFlag = true
+	} else {
+		p.IdleFlag = false
+	}
+
 }
 
 func (p *Print) SendJsonrpc(data Jsonrpc) {
@@ -193,7 +198,6 @@ func (p *Print) UploadFile(gcodeFile GcodeFile) {
 		return
 	}
 	fmt.Println(string(body))
-	p.print_flag = false
 }
 
 func (p *Print) SetStatus(status uint) {
@@ -202,6 +206,10 @@ func (p *Print) SetStatus(status uint) {
 
 func (p *Print) GetStatus() int {
 	return p.status
+}
+
+func (p *Print) GetIdleFlag() bool {
+	return p.IdleFlag
 }
 
 // pass off gcode file for printer to handle
@@ -215,6 +223,12 @@ func (p *Print) HandlePrintRequest(gcodeFile GcodeFile, ctx context.Context, cli
 	// prompt the printer technician, and wait for print start confirmation
 	// channels
 	p.SetPendingNotification()
+
+	// If printer is idle, GetIdleFlag==True, stay in for loop
+	for p.GetIdleFlag() {
+		time.Sleep(time.Second)
+	}
+
 	// placeholder
 	proceedWithPrint := true
 
@@ -226,7 +240,6 @@ func (p *Print) HandlePrintRequest(gcodeFile GcodeFile, ctx context.Context, cli
 
 			// return an int, needs WaitGroup to ensure status is accurate
 			p.RequestPrintStatus()
-
 			printStatus := p.GetStatus()
 
 			//-----------------------------------------------------------------------------
@@ -243,7 +256,16 @@ func (p *Print) HandlePrintRequest(gcodeFile GcodeFile, ctx context.Context, cli
 
 				// Wait until technician removes print, reset printer status to standby
 				// WaitGroup here
-				p.waitForTechnicianToConfirmPrinterIsOnStandby()
+
+				// Send notification to release printer back to the queue
+
+				/* While printing GetIdleFlag evaluates to false
+				When technitian is ready, LCD status is changed to Idle and GetIdleFlag evaluates to true
+				Breaks out of the loop
+				*/
+				for p.GetIdleFlag() == false {
+					time.Sleep(time.Second)
+				}
 
 				// close this goroutine
 				runtime.Goexit()
