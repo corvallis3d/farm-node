@@ -7,6 +7,24 @@ import (
 	"github.com/spf13/viper"
 )
 
+const (
+	GcodeIdle         = 0
+	GcodePrinting     = 1
+	GcodePrintSuccess = 2
+	GcodeCanceled     = 3
+	GcodeError        = 9
+
+	JobIdle       = 0
+	JobInProgress = 1
+	JobCompleted  = 2
+)
+
+var (
+	jobs         = []Job{}
+	printerArray []Print
+	gcodeQueue   []GcodeFile
+)
+
 func main() {
 	viper.SetConfigName("development")
 	viper.SetConfigType("toml")
@@ -34,6 +52,8 @@ func main() {
 	go jobsSnapshot(ctx, client)
 
 	go managePrintJobs(ctx, client)
+
+	go maintainFirestore(ctx, client)
 
 	// Wait forever!
 	for {

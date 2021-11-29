@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"sync"
 	"time"
 
 	"cloud.google.com/go/firestore"
@@ -12,21 +11,6 @@ import (
 	"github.com/spf13/viper"
 	"google.golang.org/api/option"
 )
-
-const GcodeIdle = 0
-const GcodePrinting = 1
-const GcodePrintSuccess = 2
-const GcodeCanceled = 3
-const GcodeError = 9
-
-const JobIdle = 0
-const JobInProgress = 1
-const JobCompleted = 2
-
-var jobs = []Job{}
-var printerArray []Print
-
-var gcodeQueue []GcodeFile
 
 // jobsSnapshot keeps our local global jobs in sync with firebase
 func jobsSnapshot(ctx context.Context, client *firestore.Client) {
@@ -126,30 +110,6 @@ func FirebaseInstance() (*firestore.Client, context.Context, error) {
 	return client, ctx, nil
 }
 
-// Parses the toml config for printer host and ports, creates printer objects,
-// and stores Printer pointers in array
-func instantiateAllPrinters() {
-	printers := viper.GetStringMap("printers")
-
-	for i := range printers {
-		printer_host := "printers." + i + ".host"
-		printer_port := "printers." + i + ".port"
-
-		// fmt.Printf("%s, %s\n", viper.GetString(printer_host), viper.GetString(printer_port))
-
-		p := NewPrinter(viper.GetString(printer_host), viper.GetString(printer_port))
-
-		printerArray = append(printerArray, *p)
-	}
-}
-
-// Have printers call method to update their status
-func updatePrinterStatus() {
-	for i, p := range printerArray {
-		fmt.Println(i, p)
-	}
-}
-
 // Update status for a single Gcode file in database
 // Copies whole doc, modifes, then replaces
 func UpdateFileStatus(gcode GcodeFile, ctx context.Context, client *firestore.Client) {
@@ -185,60 +145,54 @@ func UpdateFileStatus(gcode GcodeFile, ctx context.Context, client *firestore.Cl
 	fmt.Println(wr.UpdateTime)
 }
 
-func managePrintJobs(ctx context.Context, client *firestore.Client) {
-
-	// Just keep looping until a GF is in queue
-	for range time.Tick(time.Second * 10) {
-
-		// if gcodeQueue is empty
-		if len(gcodeQueue) == 0 {
-			continue
-		}
-
-		gcode := popFromGcodeQueue()
-		printer := findPrinterToHandleFile(gcode)
-		assignFileToPrinter(printer, gcode, ctx, client)
-
-	}
-}
-
-// pops gcodeFile from global GcodeFile queue
-func popFromGcodeQueue() GcodeFile {
-	var m sync.Mutex
-
-	m.Lock()
-	gcode := gcodeQueue[0]
-	gcodeQueue = gcodeQueue[1:]
-	m.Unlock()
-
-	return gcode
-}
-
-// Given a GcodeFile, return a printer to handle it
-func findPrinterToHandleFile(gcode GcodeFile) Print {
-	for {
-		updatePrinterStatus()
-		for i := range printerArray {
-			printer := printerArray[i]
-			if (printer.LastUsedColor == gcode.Filament.Color &&
-				printer.LastUsedMaterial == gcode.Filament.Material) &&
-				printer.GetStatus() == Standby {
-				return printer
+//-----------------------------------------------------------------------------
+// check local jobs array, scanning for gcode statuses if all gcode statuses
+// are completed, or canceled then update firestore database by removing job
+// document from jobs collection and into completed_jobs collection
+// keep looping
+func maintainFirestore(ctx context.Context, client *firestore.Client) {
+	for range time.Tick(time.Minute * 1) {
+		for i := range jobs {
+			job := jobs[i]
+			jobId := job.JobId
+			fmt.Print(jobId)
+			gcodeFiles := job.GcodeFiles
+			count := 0
+			for j := range gcodeFiles {
+				gcodeFile := gcodeFiles[j]
+				if gcodeFile.Status == GcodePrintSuccess || gcodeFile.Status == GcodeCanceled {
+					count += 1
+				}
 			}
-		}
-		for i := range printerArray {
-			printer := printerArray[i]
-			if printer.GetStatus() == Standby {
-				return printer
+			// Move job from jobs collection to completed_jobs collection
+			// Grabs job document pertaining to jobId
+			document := client.Doc(fmt.Sprintf("jobs/%s", jobId))
+			var jobDocument Job
+			docsnap, err := document.Get(ctx)
+
+			if err != nil {
+				fmt.Println(err)
 			}
+
+			err = docsnap.DataTo(&jobDocument)
+			if err != nil {
+				fmt.Println(err)
+			}
+
+			//fmt.Println(jobDocument)
+			// references completed_jobs collection to be copied into
+			newDocument := client.Doc(fmt.Sprintf("completed_jobs/%s", jobId))
+			wr, err := newDocument.Set(ctx, jobDocument)
+			if err != nil {
+				fmt.Println(err)
+			}
+			fmt.Println(wr.UpdateTime)
+
+			// wr, err = document.Delete(ctx)
+			// if err != nil {
+			// 	fmt.Println(err)
+			// }
+			// fmt.Println(wr.UpdateTime)
 		}
 	}
-}
-
-// Spins off a thread for a printer method to handle a file. Update that
-// file's status in the database
-func assignFileToPrinter(printer Print, gcode GcodeFile, ctx context.Context, client *firestore.Client) {
-	go printer.HandlePrintRequest(gcode, ctx, client)
-	gcode.SetStatus(GcodePrinting)
-	UpdateFileStatus(gcode, ctx, client)
 }
