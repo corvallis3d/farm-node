@@ -153,8 +153,7 @@ func (p *Print) UploadFile(GF GcodeFile) {
 	writer := multipart.NewWriter(payload)
 	file, errFile1 := os.Open(fmt.Sprintf("C:/Models/Processed Orders/Order #%s - First Last/Upload-Gcode/%s", GF.JobId, GF.Filename))
 	defer file.Close()
-	part1,
-		errFile1 := writer.CreateFormFile("file", filepath.Base(fmt.Sprintf("C:/Models/Processed Orders/Order #%s - First Last/Upload-Gcode/%s", GF.JobId, GF.Filename)))
+	part1, errFile1 := writer.CreateFormFile("file", filepath.Base(fmt.Sprintf("C:/Models/Processed Orders/Order #%s - First Last/Upload-Gcode/%s", GF.JobId, GF.Filename)))
 	_, errFile1 = io.Copy(part1, file)
 	if errFile1 != nil {
 		fmt.Println(errFile1)
@@ -204,13 +203,9 @@ func (p *Print) GetIdleFlag() bool {
 // pass off gcode file for printer to handle
 func (p *Print) HandlePrintRequest(GF GcodeFile, ctx context.Context, client *firestore.Client) {
 
-	// set this printer to busy
 	p.SetStatus(Setup)
-	// upload the file
 	p.UploadFile(GF)
 
-	// prompt the printer technician, and wait for print start confirmation
-	// channels
 	p.SetDisplayNotification(GF)
 
 	// If printer is idle, GetIdleFlag==True, stay in for loop
@@ -218,71 +213,55 @@ func (p *Print) HandlePrintRequest(GF GcodeFile, ctx context.Context, client *fi
 		time.Sleep(time.Second)
 	}
 
-	// placeholder
-	proceedWithPrint := true
+	p.StartFilenamePrint(GF.Filename)
 
-	if proceedWithPrint {
-		// start the print
-		p.StartFilenamePrint(GF.Filename)
+	// Check on the print status
+	for range time.Tick(time.Second * 30) {
+		p.RequestPrintStatus()
+		printStatus := p.Status
 
-		for range time.Tick(time.Second * 30) {
+		if printStatus == Completed {
+			p.SetStatus(Resetting)
+			GF.SetStatus(GcodePrintSuccess)
+			UpdateFileStatus(GF, ctx, client)
 
-			// return an int, needs WaitGroup to ensure status is accurate
-			p.RequestPrintStatus()
-			printStatus := p.GetStatus()
+			// Wait until technician removes print, reset printer status to standby
+			// Send notification to release printer back to the queue
 
 			//-----------------------------------------------------------------------------
-			// only have to handle Completed, Paused, Canceled, Error
-			if printStatus == Completed {
-
-				p.SetStatus(Resetting)
-
-				// update gcode file status locally
-				GF.SetStatus(GcodePrintSuccess)
-
-				// update the gcode file status
-				UpdateFileStatus(GF, ctx, client)
-
-				// Wait until technician removes print, reset printer status to standby
-				// WaitGroup here
-
-				// Send notification to release printer back to the queue
-
-				/* While printing GetIdleFlag evaluates to false
-				When technitian is ready, LCD status is changed to Idle and GetIdleFlag evaluates to true
-				Breaks out of the loop
-				*/
-				for p.GetIdleFlag() == false {
-					time.Sleep(time.Second)
-				}
-
-				// close this goroutine
-				runtime.Goexit()
-
-			} else if printStatus == Paused {
-				// Send prompt to technician, to resume print or to cancel print
-				// placeholder
-				resumePrint := false
-
-				for {
-					if resumePrint {
-						break
-					}
-				}
-			} else if printStatus == Canceled {
-				// set printer status to resetting
-				p.SetStatus(Resetting)
-				// update gcode file status locally
-				GF.SetStatus(GcodeCanceled)
-
-				// update the gcode file status
-				UpdateFileStatus(GF, ctx, client)
-
-			} else if printStatus == E {
-
-			} else {
-				continue
+			/* While printing, GetIdleFlag evaluates to false.
+			When technician is ready, LCD status is changed to Idle and
+			GetIdleFlag evaluates to true
+			*/
+			for p.GetIdleFlag() == false {
+				time.Sleep(time.Second)
 			}
+			p.LastUsedColor = GF.Color
+			p.LastUsedMaterial = GF.Material
+			p.SetStatus(Standby)
+			runtime.Goexit()
+
+			// IF PAUSED
+		} else if printStatus == Paused {
+			fmt.Println("Paused")
+		} else if printStatus == Canceled {
+			p.SetStatus(Resetting)
+			GF.SetStatus(GcodeCanceled)
+
+			UpdateFileStatus(GF, ctx, client)
+			// Send notification to release printer back to the queue
+
+			for p.GetIdleFlag() == false {
+				time.Sleep(time.Second)
+			}
+			p.LastUsedColor = GF.Color
+			p.LastUsedMaterial = GF.Material
+
+			p.SetStatus(Standby)
+			runtime.Goexit()
+
+		} else if printStatus == E {
+
 		}
 	}
 }
