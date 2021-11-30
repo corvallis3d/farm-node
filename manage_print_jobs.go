@@ -45,7 +45,7 @@ func findPrinterToHandleFile(gcode GcodeFile) Print {
 	for {
 		updatePrinterStatus()
 		for i := range printerArray {
-			printer := printerArray[i]
+			printer := *printerArray[i]
 			if (printer.LastUsedColor == gcode.Filament.Color &&
 				printer.LastUsedMaterial == gcode.Filament.Material) &&
 				printer.GetStatus() == Standby {
@@ -53,7 +53,7 @@ func findPrinterToHandleFile(gcode GcodeFile) Print {
 			}
 		}
 		for i := range printerArray {
-			printer := printerArray[i]
+			printer := *printerArray[i]
 			if printer.GetStatus() == Standby {
 				return printer
 			}

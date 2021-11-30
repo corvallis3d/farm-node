@@ -21,7 +21,7 @@ const (
 
 var (
 	jobs         = []Job{}
-	printerArray []Print
+	printerArray []*Print
 	gcodeQueue   []GcodeFile
 )
 
