@@ -32,14 +32,14 @@ type Print struct {
 	done             chan struct{}
 }
 
-func NewPrinter(host string, port string) **Print {
+func NewPrinter(host string, port string) *Print {
 	p := new(Print)
 	p.Host = host
 	p.Port = port
 	p.Status = Standby
 	p.Connect()
 	p.StartReceiveThread()
-	return &p
+	return p
 }
 
 func (p *Print) Connect() {

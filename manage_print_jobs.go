@@ -29,7 +29,7 @@ func instantiateAllPrinters() {
 
 		p := NewPrinter(viper.GetString(printer_host), viper.GetString(printer_port))
 
-		printerArray = append(printerArray, *p)
+		printerArray = append(printerArray, p)
 	}
 }
 
@@ -41,11 +41,11 @@ func updatePrinterStatus() {
 }
 
 // Given a GcodeFile, return a printer to handle it
-func findPrinterToHandleFile(gcode GcodeFile) Print {
+func findPrinterToHandleFile(gcode GcodeFile) *Print {
 	for {
 		updatePrinterStatus()
 		for i := range printerArray {
-			printer := *printerArray[i]
+			printer := printerArray[i]
 			if (printer.LastUsedColor == gcode.Filament.Color &&
 				printer.LastUsedMaterial == gcode.Filament.Material) &&
 				printer.GetStatus() == Standby {
@@ -53,7 +53,7 @@ func findPrinterToHandleFile(gcode GcodeFile) Print {
 			}
 		}
 		for i := range printerArray {
-			printer := *printerArray[i]
+			printer := printerArray[i]
 			if printer.GetStatus() == Standby {
 				return printer
 			}
@@ -63,7 +63,7 @@ func findPrinterToHandleFile(gcode GcodeFile) Print {
 
 // Spins off a thread for a printer method to handle a file. Update that
 // file's status in the database
-func assignFileToPrinter(printer Print, gcode GcodeFile, ctx context.Context, client *firestore.Client) {
+func assignFileToPrinter(printer *Print, gcode GcodeFile, ctx context.Context, client *firestore.Client) {
 	go printer.HandlePrintRequest(gcode, ctx, client)
 	gcode.SetStatus(GcodePrinting)
 	UpdateFileStatus(gcode, ctx, client)
