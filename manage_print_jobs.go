@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
@@ -14,6 +15,11 @@ import (
 // and stores Printer pointers in array
 func instantiateAllPrinters() {
 	printers := viper.GetStringMap("printers")
+
+	if len(printers) == 0 {
+		fmt.Println("No printers in config")
+		os.Exit(1)
+	}
 
 	for i := range printers {
 		printer_host := "printers." + i + ".host"
@@ -29,8 +35,8 @@ func instantiateAllPrinters() {
 
 // Have printers call method to update their status
 func updatePrinterStatus() {
-	for i, p := range printerArray {
-		fmt.Println(i, p)
+	for i := range printerArray {
+		printerArray[i].RequestPrintStatus()
 	}
 }
 

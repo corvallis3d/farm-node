@@ -204,30 +204,28 @@ func (p *Print) GetIdleFlag() bool {
 func (p *Print) HandlePrintRequest(GF GcodeFile, ctx context.Context, client *firestore.Client) {
 
 	p.SetStatus(Setup)
+	p.LastUsedColor = GF.Color
+	p.LastUsedMaterial = GF.Material
 	p.UploadFile(GF)
-
 	p.SetDisplayNotification(GF)
-
 	// If printer is idle, GetIdleFlag==True, stay in for loop
 	for p.GetIdleFlag() {
 		time.Sleep(time.Second)
 	}
 
 	p.StartFilenamePrint(GF.Filename)
-
 	// Check on the print status
 	for range time.Tick(time.Second * 30) {
 		p.RequestPrintStatus()
 		printStatus := p.Status
 
 		if printStatus == Completed {
+
 			p.SetStatus(Resetting)
 			GF.SetStatus(GcodePrintSuccess)
 			UpdateFileStatus(GF, ctx, client)
-
 			// Wait until technician removes print, reset printer status to standby
 			// Send notification to release printer back to the queue
-
 			//-----------------------------------------------------------------------------
 			/* While printing, GetIdleFlag evaluates to false.
 			When technician is ready, LCD status is changed to Idle and
@@ -236,31 +234,28 @@ func (p *Print) HandlePrintRequest(GF GcodeFile, ctx context.Context, client *fi
 			for p.GetIdleFlag() == false {
 				time.Sleep(time.Second)
 			}
-			p.LastUsedColor = GF.Color
-			p.LastUsedMaterial = GF.Material
 			p.SetStatus(Standby)
 			runtime.Goexit()
 
-			// IF PAUSED
 		} else if printStatus == Paused {
+
 			fmt.Println("Paused")
+
 		} else if printStatus == Canceled {
+
 			p.SetStatus(Resetting)
 			GF.SetStatus(GcodeCanceled)
-
 			UpdateFileStatus(GF, ctx, client)
 			// Send notification to release printer back to the queue
-
 			for p.GetIdleFlag() == false {
 				time.Sleep(time.Second)
 			}
-			p.LastUsedColor = GF.Color
-			p.LastUsedMaterial = GF.Material
-
 			p.SetStatus(Standby)
 			runtime.Goexit()
 
 		} else if printStatus == E {
+
+			fmt.Println("Error!")
 
 		}
 	}
