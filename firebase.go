@@ -142,7 +142,7 @@ func UpdateFileStatus(gcode GcodeFile, ctx context.Context, client *firestore.Cl
 	if err != nil {
 		fmt.Println(err)
 	}
-	fmt.Println(wr.UpdateTime)
+	fmt.Println(wr.UpdateTime, "Job ID:", jobId, "File Index:", fileIndex, "Status updated to 1")
 }
 
 //-----------------------------------------------------------------------------

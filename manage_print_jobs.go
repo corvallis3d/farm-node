@@ -33,6 +33,35 @@ func instantiateAllPrinters() {
 	}
 }
 
+func managePrintJobs(ctx context.Context, client *firestore.Client) {
+
+	// Just keep looping until a GF is in queue
+	for range time.Tick(time.Second * 10) {
+
+		// if gcodeQueue is empty
+		if len(gcodeQueue) == 0 {
+			continue
+		}
+
+		gcode := popFromGcodeQueue()
+		printer := findPrinterToHandleFile(gcode)
+		assignFileToPrinter(printer, gcode, ctx, client)
+
+	}
+}
+
+// pops gcodeFile from global GcodeFile queue
+func popFromGcodeQueue() GcodeFile {
+	var m sync.Mutex
+
+	m.Lock()
+	gcode := gcodeQueue[0]
+	gcodeQueue = gcodeQueue[1:]
+	m.Unlock()
+
+	return gcode
+}
+
 // Have printers call method to update their status
 func updatePrinterStatus() {
 	for i := range printerArray {
@@ -67,33 +96,4 @@ func assignFileToPrinter(printer *Print, gcode GcodeFile, ctx context.Context, c
 	go printer.HandlePrintRequest(gcode, ctx, client)
 	gcode.SetStatus(GcodePrinting)
 	UpdateFileStatus(gcode, ctx, client)
-}
-
-func managePrintJobs(ctx context.Context, client *firestore.Client) {
-
-	// Just keep looping until a GF is in queue
-	for range time.Tick(time.Second * 10) {
-
-		// if gcodeQueue is empty
-		if len(gcodeQueue) == 0 {
-			continue
-		}
-
-		gcode := popFromGcodeQueue()
-		printer := findPrinterToHandleFile(gcode)
-		assignFileToPrinter(printer, gcode, ctx, client)
-
-	}
-}
-
-// pops gcodeFile from global GcodeFile queue
-func popFromGcodeQueue() GcodeFile {
-	var m sync.Mutex
-
-	m.Lock()
-	gcode := gcodeQueue[0]
-	gcodeQueue = gcodeQueue[1:]
-	m.Unlock()
-
-	return gcode
 }
