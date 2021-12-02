@@ -37,6 +37,7 @@ func NewPrinter(host string, port string) *Print {
 	p.Host = host
 	p.Port = port
 	p.Status = Standby
+	p.IdleFlag = true
 	p.Connect()
 	p.StartReceiveThread()
 	return p
@@ -86,7 +87,6 @@ func (p *Print) ProcessReceivedData(data Jsonrpc) {
 	case "notify_proc_stat_update":
 		return
 	case "notify_gcode_response":
-		fmt.Print(p.IdleFlag)
 		p.ProcessGcodeResponse(data.Params.([]interface{})[0].(string))
 		return
 	}
