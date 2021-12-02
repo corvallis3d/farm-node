@@ -40,7 +40,7 @@ func main() {
 	viper.WatchConfig()
 
 	// Will need error handling
-	// instantiateAllPrinters()
+	instantiateAllPrinters()
 
 	// Get firebase instance
 	client, ctx, err := FirebaseInstance()
@@ -49,13 +49,14 @@ func main() {
 	}
 
 	// Spin-off snapshot worker
-	// go jobsSnapshot(ctx, client)
+	go jobsSnapshot(ctx, client)
 
-	// go managePrintJobs(ctx, client)
+	go managePrintJobs(ctx, client)
 
-	// go maintainFirestore(ctx, client)
+	go maintainFirestore(ctx, client)
 
-	go addFalseDocumentToJobsCollection(ctx, client)
+	//go addFalseDocumentToJobsCollection(ctx, client)
+
 	// Wait forever!
 	for {
 
